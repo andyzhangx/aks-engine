@@ -28,6 +28,13 @@ write_files:
   owner: root
   content: !!binary |
     {{CloudInitData "provisionConfigs"}}
+
+- path: /opt/azure/containers/provision_cis.sh
+  permissions: "0744"
+  encoding: gzip
+  owner: root
+  content: !!binary |
+    {{CloudInitData "provisionCIS"}}
     
 {{if IsAzureStackCloud}}
 - path: /opt/azure/containers/provision_configs_custom_cloud.sh
@@ -251,7 +258,9 @@ write_files:
     KUBELET_IMAGE={{WrapAsParameter "kubernetesHyperkubeSpec"}}
     KUBELET_REGISTER_SCHEDULABLE=true
     KUBELET_NODE_LABELS={{GetAgentKubernetesLabels . "',variables('labelResourceGroup'),'"}}
-
+{{if IsAzureStackCloud }}
+    AZURE_ENVIRONMENT_FILEPATH=/etc/kubernetes/azurestackcloud.json
+{{end}}
 AGENT_ARTIFACTS_CONFIG_PLACEHOLDER
 
 - path: /opt/azure/containers/kubelet.sh
