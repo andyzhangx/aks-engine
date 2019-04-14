@@ -66,7 +66,7 @@ func newUpgradeCmd() *cobra.Command {
 	f := upgradeCmd.Flags()
 	f.StringVarP(&uc.location, "location", "l", "", "location the cluster is deployed in (required)")
 	f.StringVarP(&uc.resourceGroupName, "resource-group", "g", "", "the resource group where the cluster is deployed (required)")
-	f.StringVarP(&uc.apiModelPath, "api-model", "m", "", "path to the apimodel file")
+	f.StringVarP(&uc.apiModelPath, "api-model", "m", "", "path to the generated apimodel file")
 	f.StringVar(&uc.deploymentDirectory, "deployment-dir", "", "the location of the output from `generate`")
 	f.StringVarP(&uc.upgradeVersion, "upgrade-version", "k", "", "desired kubernetes version (required)")
 	f.IntVar(&uc.timeoutInMinutes, "vm-timeout", -1, "how long to wait for each vm to be upgraded in minutes")
@@ -149,7 +149,10 @@ func (uc *upgradeCmd) loadCluster(cmd *cobra.Command) error {
 
 	if uc.containerService.Properties.IsAzureStackCloud() {
 		writeCustomCloudProfile(uc.containerService)
-		uc.containerService.Properties.SetAzureStackCloudSpec()
+		err = uc.containerService.Properties.SetAzureStackCloudSpec()
+		if err != nil {
+			return errors.Wrap(err, "error parsing the api model")
+		}
 	}
 
 	if err = uc.getAuthArgs().validateAuthArgs(); err != nil {

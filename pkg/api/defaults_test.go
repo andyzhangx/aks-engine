@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/google/go-cmp/cmp"
+	"github.com/pkg/errors"
 	"gopkg.in/jarcoal/httpmock.v1"
 )
 
@@ -1344,22 +1345,22 @@ func TestSetCertDefaults(t *testing.T) {
 
 	cs.setOrchestratorDefaults(false)
 	cs.Properties.setMasterProfileDefaults(false)
-	result, ips, err := cs.setDefaultCerts()
+	result, ips, err := cs.SetDefaultCerts()
 
 	if !result {
-		t.Error("expected setDefaultCerts to return true")
+		t.Error("expected SetDefaultCerts to return true")
 	}
 
 	if err != nil {
-		t.Errorf("unexpected error thrown while executing setDefaultCerts %s", err.Error())
+		t.Errorf("unexpected error thrown while executing SetDefaultCerts %s", err.Error())
 	}
 
 	if ips == nil {
-		t.Error("expected setDefaultCerts to create a list of IPs")
+		t.Error("expected SetDefaultCerts to create a list of IPs")
 	} else {
 
 		if len(ips) != cs.Properties.MasterProfile.Count+3 {
-			t.Errorf("expected length of IPs from setDefaultCerts %d, actual length %d", cs.Properties.MasterProfile.Count+3, len(ips))
+			t.Errorf("expected length of IPs from SetDefaultCerts %d, actual length %d", cs.Properties.MasterProfile.Count+3, len(ips))
 		}
 
 		firstMasterIP := net.ParseIP(cs.Properties.MasterProfile.FirstConsecutiveStaticIP).To4()
@@ -1370,7 +1371,7 @@ func TestSetCertDefaults(t *testing.T) {
 		if actualLastIPAddr != expectedNewAddr {
 			expectedLastIP := make(net.IP, 4)
 			binary.BigEndian.PutUint32(expectedLastIP, expectedNewAddr)
-			t.Errorf("expected last IP of master vm from setDefaultCerts %d, actual %d", expectedLastIP, ips[len(ips)-2])
+			t.Errorf("expected last IP of master vm from SetDefaultCerts %d, actual %d", expectedLastIP, ips[len(ips)-2])
 		}
 
 		if cs.Properties.MasterProfile.Count > 1 {
@@ -1379,7 +1380,7 @@ func TestSetCertDefaults(t *testing.T) {
 			expectedILBIPAddr := binary.BigEndian.Uint32(expectedILBIP)
 
 			if actualILBIPAddr != expectedILBIPAddr {
-				t.Errorf("expected IP of master ILB from setDefaultCerts %d, actual %d", expectedILBIP, ips[2])
+				t.Errorf("expected IP of master ILB from SetDefaultCerts %d, actual %d", expectedILBIP, ips[2])
 			}
 		}
 	}
@@ -1410,22 +1411,22 @@ func TestSetCertDefaultsVMSS(t *testing.T) {
 
 	cs.setOrchestratorDefaults(false)
 	cs.Properties.setMasterProfileDefaults(false)
-	result, ips, err := cs.setDefaultCerts()
+	result, ips, err := cs.SetDefaultCerts()
 
 	if !result {
-		t.Error("expected setDefaultCerts to return true")
+		t.Error("expected SetDefaultCerts to return true")
 	}
 
 	if err != nil {
-		t.Errorf("unexpected error thrown while executing setDefaultCerts %s", err.Error())
+		t.Errorf("unexpected error thrown while executing SetDefaultCerts %s", err.Error())
 	}
 
 	if ips == nil {
-		t.Error("expected setDefaultCerts to create a list of IPs")
+		t.Error("expected SetDefaultCerts to create a list of IPs")
 	} else {
 
 		if len(ips) != cs.Properties.MasterProfile.Count+3 {
-			t.Errorf("expected length of IPs from setDefaultCerts %d, actual length %d", cs.Properties.MasterProfile.Count+3, len(ips))
+			t.Errorf("expected length of IPs from SetDefaultCerts %d, actual length %d", cs.Properties.MasterProfile.Count+3, len(ips))
 		}
 
 		firstMasterIP := net.ParseIP(cs.Properties.MasterProfile.FirstConsecutiveStaticIP).To4()
@@ -1436,7 +1437,7 @@ func TestSetCertDefaultsVMSS(t *testing.T) {
 		if actualLastIPAddr != expectedNewAddr {
 			expectedLastIP := make(net.IP, 4)
 			binary.BigEndian.PutUint32(expectedLastIP, expectedNewAddr)
-			t.Errorf("expected last IP of master vm from setDefaultCerts %d, actual %d", expectedLastIP, ips[len(ips)-2])
+			t.Errorf("expected last IP of master vm from SetDefaultCerts %d, actual %d", expectedLastIP, ips[len(ips)-2])
 		}
 
 		if cs.Properties.MasterProfile.Count > 1 {
@@ -1445,7 +1446,7 @@ func TestSetCertDefaultsVMSS(t *testing.T) {
 			expectedILBIPAddr := binary.BigEndian.Uint32(expectedILBIP)
 
 			if actualILBIPAddr != expectedILBIPAddr {
-				t.Errorf("expected IP of master ILB from setDefaultCerts %d, actual %d", expectedILBIP, ips[2])
+				t.Errorf("expected IP of master ILB from SetDefaultCerts %d, actual %d", expectedILBIP, ips[2])
 			}
 		}
 	}
@@ -1526,6 +1527,27 @@ func TestSetCustomCloudProfileDefaults(t *testing.T) {
 		if diff := cmp.Diff(actualEnvAzureChinaSpec, expectedEnvAzureChinaSpec); diff != "" {
 			t.Errorf("setCustomCloudProfileDefaults(): did not set AzureStackCloudSpec as default when connection Mode is %s in api model JSON file. %s", key, diff)
 		}
+	}
+
+	// Test that correct error message if ResourceManagerVMDNSSuffix is empty
+	mockCSEmptyResourceManagerVMDNSSuffix := getMockBaseContainerService("1.11.6")
+	mockCSPEmptyResourceManagerVMDNSSuffix := getMockPropertiesWithCustomCloudProfile("azurestackcloud", true, true, false)
+	mockCSEmptyResourceManagerVMDNSSuffix.Properties.CustomCloudProfile = mockCSPEmptyResourceManagerVMDNSSuffix.CustomCloudProfile
+	mockCSEmptyResourceManagerVMDNSSuffix.Properties.CustomCloudProfile.Environment.ResourceManagerVMDNSSuffix = ""
+	acutalerr := mockCSEmptyResourceManagerVMDNSSuffix.Properties.SetAzureStackCloudSpec()
+	expectError := errors.New("Failed to set Cloud Spec for Azure Stack due to invalid environment")
+	if !helpers.EqualError(acutalerr, expectError) {
+		t.Errorf("verify ResourceManagerVMDNSSuffix empty: expected error: %s - got: %s", acutalerr, expectError)
+	}
+
+	// Test that correct error message if environment is nil
+	mockCSNilEnvironment := getMockBaseContainerService("1.11.6")
+	mockCSPNilEnvironment := getMockPropertiesWithCustomCloudProfile("azurestackcloud", true, true, false)
+	mockCSNilEnvironment.Properties.CustomCloudProfile = mockCSPNilEnvironment.CustomCloudProfile
+	mockCSNilEnvironment.Properties.CustomCloudProfile.Environment = nil
+	acutalerr = mockCSEmptyResourceManagerVMDNSSuffix.Properties.SetAzureStackCloudSpec()
+	if !helpers.EqualError(acutalerr, expectError) {
+		t.Errorf("verify environment nil: expected error: %s - got: %s", acutalerr, expectError)
 	}
 
 	// Test that default assignment flow doesn't overwrite a user-provided config
@@ -1751,6 +1773,38 @@ func TestSetCustomCloudProfileEnvironmentDefaults(t *testing.T) {
 			},
 		},
 	}
+
+	//test setCustomCloudProfileDefaults with protal url
+	mockCS := getMockBaseContainerService("1.11.6")
+	mockCS.Properties.CustomCloudProfile = &CustomCloudProfile{
+		PortalURL: "https://portal.testlocation.contoso.com",
+	}
+
+	httpmock.DeactivateAndReset()
+	httpmock.Activate()
+	httpmock.RegisterResponder("GET", fmt.Sprintf("%smetadata/endpoints?api-version=1.0", fmt.Sprintf("https://management.%s.contoso.com/", location)),
+		func(req *http.Request) (*http.Response, error) {
+			resp := httpmock.NewStringResponse(200, `{"galleryEndpoint":"https://galleryartifacts.hosting.testlocation.contoso.com/galleryartifacts/","graphEndpoint":"https://graph.testlocation.contoso.com/","portalEndpoint":"https://portal.testlocation.contoso.com/","authentication":{"loginEndpoint":"https://adfs.testlocation.contoso.com/","audiences":["https://management.adfs.azurestack.testlocation/ce080287-be51-42e5-b99e-9de760fecae7"]}}`)
+			return resp, nil
+		},
+	)
+	mockCS.Location = location
+	_, err = mockCS.SetPropertiesDefaults(false, false)
+	if err != nil {
+		t.Errorf("Failed to test setCustomCloudProfileDefaults with protal url - %s", err)
+	}
+	if diff := cmp.Diff(mockCS.Properties.CustomCloudProfile.Environment, expectedEnv); diff != "" {
+		t.Errorf("Fail to compare, Environment setCustomCloudProfileDefaults %q", diff)
+	}
+
+	cloudSpec := AzureCloudSpecEnvMap[AzurePublicCloud]
+	cloudSpec.CloudName = AzureStackCloud
+	cloudSpec.EndpointConfig.ResourceManagerVMDNSSuffix = mockCS.Properties.CustomCloudProfile.Environment.ResourceManagerVMDNSSuffix
+	if diff := cmp.Diff(AzureCloudSpecEnvMap[AzureStackCloud], cloudSpec); diff != "" {
+		t.Errorf("Fail to compare, AzureCloudSpec AzureStackCloud %q", diff)
+	}
+
+	// Test for azure_ad
 	httpmock.DeactivateAndReset()
 	httpmock.Activate()
 	httpmock.RegisterResponder("GET", fmt.Sprintf("%smetadata/endpoints?api-version=1.0", fmt.Sprintf("https://management.%s.contoso.com/", location)),
