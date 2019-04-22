@@ -50,6 +50,7 @@ ERR_APT_DIST_UPGRADE_TIMEOUT=101 # Timeout waiting for apt-get dist-upgrade to c
 ERR_SYSCTL_RELOAD=103 # Error reloading sysctl config
 ERR_CIS_ASSIGN_ROOT_PW=111 # Error assigning root password in CIS enforcement
 ERR_CIS_ASSIGN_FILE_PERMISSION=112 # Error assigning permission to a file in CIS enforcement
+ERR_CIS_COPY_FILE=113 # Error writing a file to disk for CIS enforcement
 
 OS=$(cat /etc/*-release | grep ^ID= | tr -d 'ID="' | awk '{print toupper($0)}')
 UBUNTU_OS_NAME="UBUNTU"
@@ -152,6 +153,7 @@ apt_get_update() {
     apt_update_output=/tmp/apt-get-update.out
     for i in $(seq 1 $retries); do
         wait_for_apt_locks
+        export DEBIAN_FRONTEND=noninteractive
         dpkg --configure -a
         apt-get -f -y install
         apt-get update 2>&1 | tee $apt_update_output | grep -E "^([WE]:.*)|([eE]rr.*)$"
@@ -169,8 +171,9 @@ apt_get_install() {
     retries=$1; wait_sleep=$2; timeout=$3; shift && shift && shift
     for i in $(seq 1 $retries); do
         wait_for_apt_locks
+        export DEBIAN_FRONTEND=noninteractive
         dpkg --configure -a
-        apt-get install --no-install-recommends -y ${@}
+        apt-get install -o Dpkg::Options::="--force-confold" --no-install-recommends -y ${@}
         [ $? -eq 0  ] && break || \
         if [ $i -eq $retries ]; then
             return 1

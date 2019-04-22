@@ -45,20 +45,6 @@ write_files:
     {{WrapAsVariable "provisionConfigsCustomCloud"}}
 {{end}}
 
-- path: /etc/ssh/sshd_config
-  permissions: "0644"
-  encoding: gzip
-  owner: root
-  content: !!binary |
-    {{CloudInitData "sshdConfig"}}
-
-- path: /etc/systemd/system.conf
-  permissions: "0644"
-  encoding: gzip
-  owner: root
-  content: !!binary |
-    {{CloudInitData "systemConf"}}
-
 {{if .IsCoreOS}}
 - path: /opt/bin/health-monitor.sh
 {{else}}
@@ -120,6 +106,13 @@ write_files:
     {{CloudInitData "aptPreferences"}}
 
 {{if .IsUbuntuNonVHD}}
+- path: /etc/ssh/sshd_config
+  permissions: "0600"
+  encoding: gzip
+  owner: root
+  content: !!binary |
+    {{CloudInitData "sshdConfig"}}
+
 - path: /etc/issue
   permissions: "0644"
   encoding: gzip
@@ -141,12 +134,26 @@ write_files:
   content: !!binary |
     {{CloudInitData "cisNetEnforcement"}}
 
+- path: /etc/rsyslog.d/60-CIS.conf
+  permissions: "0644"
+  encoding: gzip
+  owner: root
+  content: !!binary |
+    {{CloudInitData "cisLogEnforcement"}}
+
 - path: /etc/modprobe.d/CIS.conf
   permissions: "0644"
   encoding: gzip
   owner: root
   content: !!binary |
     {{CloudInitData "modprobeConfCIS"}}
+
+- path: /etc/security/pwquality.conf
+  permissions: "0600"
+  encoding: gzip
+  owner: root
+  content: !!binary |
+    {{CloudInitData "pwQuality"}}
 {{end}}
 
 {{if .KubernetesConfig.RequiresDocker}}

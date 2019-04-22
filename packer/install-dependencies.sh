@@ -4,23 +4,12 @@ source /home/packer/provision_source.sh
 source /home/packer/cis.sh
 
 RELEASE_NOTES_FILEPATH=/var/log/azure/golden-image-install.complete
-SYSCTL_CONFIG_SRC=/home/packer/sysctl-d-60-CIS.conf
-SYSCTL_CONFIG_DEST=/etc/sysctl.d/60-CIS.conf
-ETC_ISSUE_CONFIG_SRC=/home/packer/etc-issue
-ETC_ISSUE_CONFIG_DEST=/etc/issue
-ETC_ISSUE_NET_CONFIG_SRC=/home/packer/etc-issue.net
-ETC_ISSUE_NET_CONFIG_DEST=/etc/issue.net
-MODPROBE_CIS_SRC=/home/packer/modprobe-CIS.conf
-MODPROBE_CIS_DEST=/etc/modprobe.d/CIS.conf
 
 echo "Starting build on " `date` > ${RELEASE_NOTES_FILEPATH}
 echo "Using kernel:" >> ${RELEASE_NOTES_FILEPATH}
 cat /proc/version | tee -a ${RELEASE_NOTES_FILEPATH}
-cp $SYSCTL_CONFIG_SRC $SYSCTL_CONFIG_DEST
-sysctl_reload 20 5 10
-cp $ETC_ISSUE_CONFIG_SRC $ETC_ISSUE_CONFIG_DEST
-cp $ETC_ISSUE_NET_CONFIG_SRC $ETC_ISSUE_NET_CONFIG_DEST
-cp $MODPROBE_CIS_SRC $MODPROBE_CIS_DEST
+
+copyPackerFiles
 
 echo ""
 echo "Components downloaded in this VHD build (some of the below components might get deleted during cluster provisioning if they are not needed):" >> ${RELEASE_NOTES_FILEPATH}
@@ -34,6 +23,7 @@ cat << EOF >> ${RELEASE_NOTES_FILEPATH}
   - cgroup-lite
   - cifs-utils
   - conntrack
+  - cracklib-runtime
   - ebtables
   - ethtool
   - fuse
@@ -44,6 +34,8 @@ cat << EOF >> ${RELEASE_NOTES_FILEPATH}
   - ipset
   - iptables
   - jq
+  - libpam-pwquality
+  - libpwquality-tools
   - mount
   - nfs-common
   - pigz socat
@@ -377,6 +369,11 @@ for KUBERNETES_VERSION in ${K8S_VERSIONS}; do
 done
 
 df -h
+
+# warn at 75% space taken
+[ -s $(df -P | grep '/dev/sda1' | awk '0+$5 >= 75 {print}') ] || echo "WARNING: 75% of /dev/sda1 is used" >> ${RELEASE_NOTES_FILEPATH}
+# error at 90% space taken
+[ -s $(df -P | grep '/dev/sda1' | awk '0+$5 >= 90 {print}') ] || exit 1
 
 echo "Install completed successfully on " `date` >> ${RELEASE_NOTES_FILEPATH}
 echo "VSTS Build NUMBER: ${BUILD_NUMBER}" >> ${RELEASE_NOTES_FILEPATH}
