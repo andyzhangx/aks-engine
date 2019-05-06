@@ -203,11 +203,12 @@ func TestAssignDefaultAddonImages(t *testing.T) {
 		DefaultReschedulerAddonName:        "k8s.gcr.io/rescheduler:v0.3.1",
 		DefaultMetricsServerAddonName:      "k8s.gcr.io/metrics-server-amd64:v0.2.1",
 		NVIDIADevicePluginAddonName:        "nvidia/k8s-device-plugin:1.10",
-		ContainerMonitoringAddonName:       "microsoft/oms:ciprod01092019",
+		ContainerMonitoringAddonName:       "microsoft/oms:ciprod04232019",
 		IPMASQAgentAddonName:               "k8s.gcr.io/ip-masq-agent-amd64:v2.0.0",
-		AzureCNINetworkMonitoringAddonName: "containernetworking/networkmonitor:v0.0.6",
+		AzureCNINetworkMonitoringAddonName: "mcr.microsoft.com/containernetworking/networkmonitor:v0.0.6",
 		DefaultDNSAutoscalerAddonName:      "k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.1",
 		DefaultHeapsterAddonName:           "k8s.gcr.io/heapster-amd64:v1.5.4",
+		DefaultCalicoDaemonSetAddonName:    "calico/typha:v3.5.0",
 	}
 
 	var addons []KubernetesAddon
@@ -542,6 +543,58 @@ func TestVMSSOverProvisioning(t *testing.T) {
 	// In create scenario with explicit false, VMSSOverProvisioningEnabled should be false
 	if to.Bool(mockCS.Properties.AgentPoolProfiles[0].VMSSOverProvisioningEnabled) {
 		t.Errorf("expected VMSSOverProvisioningEnabled to be false, instead got %t", to.Bool(mockCS.Properties.AgentPoolProfiles[0].VMSSOverProvisioningEnabled))
+	}
+}
+
+func TestAuditDEnabled(t *testing.T) {
+	mockCS := getMockBaseContainerService("1.12.7")
+	mockCS.Properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	isUpgrade := true
+	mockCS.Properties.setAgentProfileDefaults(isUpgrade, false)
+
+	// In upgrade scenario, nil AuditDEnabled should always render as false (i.e., we never turn on this feature on an existing vm that didn't have it before)
+	if to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled) {
+		t.Errorf("expected nil AuditDEnabled to be false after upgrade, instead got %t", to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled))
+	}
+
+	mockCS = getMockBaseContainerService("1.12.7")
+	mockCS.Properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	isScale := true
+	mockCS.Properties.setAgentProfileDefaults(false, isScale)
+
+	// In scale scenario, nil AuditDEnabled should always render as false (i.e., we never turn on this feature on an existing agent pool / vms that didn't have it before)
+	if to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled) {
+		t.Errorf("expected nil AuditDEnabled to be false after upgrade, instead got %t", to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled))
+	}
+
+	mockCS = getMockBaseContainerService("1.12.7")
+	mockCS.Properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	mockCS.Properties.setAgentProfileDefaults(false, false)
+
+	// In create scenario, nil AuditDEnabled should be the defaults
+	auditDEnabledEnabled := DefaultAuditDEnabled
+	if to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled) != auditDEnabledEnabled {
+		t.Errorf("expected default AuditDEnabled to be %t, instead got %t", auditDEnabledEnabled, to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled))
+	}
+
+	mockCS = getMockBaseContainerService("1.10.8")
+	mockCS.Properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled = to.BoolPtr(true)
+	mockCS.Properties.setAgentProfileDefaults(false, false)
+
+	// In create scenario with explicit true, AuditDEnabled should be true
+	if !to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled) {
+		t.Errorf("expected AuditDEnabled to be true, instead got %t", to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled))
+	}
+
+	mockCS = getMockBaseContainerService("1.10.8")
+	mockCS.Properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled = to.BoolPtr(false)
+	mockCS.Properties.setAgentProfileDefaults(false, false)
+
+	// In create scenario with explicit false, AuditDEnabled should be false
+	if to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled) {
+		t.Errorf("expected AuditDEnabled to be false, instead got %t", to.Bool(mockCS.Properties.AgentPoolProfiles[0].AuditDEnabled))
 	}
 }
 
@@ -1075,6 +1128,90 @@ func TestSetComponentsNetworkDefaults(t *testing.T) {
 	}
 }
 
+func TestWindowsProfileDefaults(t *testing.T) {
+
+	var tests = []struct {
+		name                   string // test case name
+		windowsProfile         WindowsProfile
+		expectedWindowsProfile WindowsProfile
+	}{
+		{
+			"defaults",
+			WindowsProfile{},
+			WindowsProfile{
+				WindowsPublisher:      DefaultWindowsPublisher,
+				WindowsOffer:          DefaultWindowsOffer,
+				WindowsSku:            DefaultWindowsSku,
+				ImageVersion:          DefaultImageVersion,
+				AdminUsername:         "",
+				AdminPassword:         "",
+				WindowsImageSourceURL: "",
+				WindowsDockerVersion:  "",
+				SSHEnabled:            false,
+			},
+		},
+		{
+			"user overrides",
+			WindowsProfile{
+				WindowsPublisher: "override",
+				WindowsOffer:     "override",
+				WindowsSku:       "override",
+				ImageVersion:     "override",
+			},
+			WindowsProfile{
+				WindowsPublisher:      "override",
+				WindowsOffer:          "override",
+				WindowsSku:            "override",
+				ImageVersion:          "override",
+				AdminUsername:         "",
+				AdminPassword:         "",
+				WindowsImageSourceURL: "",
+				WindowsDockerVersion:  "",
+				SSHEnabled:            false,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		mockAPI := getMockAPIProperties("1.14.0")
+		mockAPI.WindowsProfile = &test.windowsProfile
+		mockAPI.setWindowsProfileDefaults(false, false)
+		if mockAPI.WindowsProfile.WindowsPublisher != test.expectedWindowsProfile.WindowsPublisher {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.WindowsPublisher, test.expectedWindowsProfile.WindowsPublisher)
+		}
+		if mockAPI.WindowsProfile.WindowsOffer != test.expectedWindowsProfile.WindowsOffer {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.WindowsOffer, test.expectedWindowsProfile.WindowsOffer)
+		}
+		if mockAPI.WindowsProfile.WindowsSku != test.expectedWindowsProfile.WindowsSku {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.WindowsSku, test.expectedWindowsProfile.WindowsSku)
+		}
+		if mockAPI.WindowsProfile.ImageVersion != test.expectedWindowsProfile.ImageVersion {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.ImageVersion, test.expectedWindowsProfile.ImageVersion)
+		}
+		if mockAPI.WindowsProfile.AdminUsername != test.expectedWindowsProfile.AdminUsername {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.AdminUsername, test.expectedWindowsProfile.AdminUsername)
+		}
+		if mockAPI.WindowsProfile.AdminPassword != test.expectedWindowsProfile.AdminPassword {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.AdminPassword, test.expectedWindowsProfile.AdminPassword)
+		}
+		if mockAPI.WindowsProfile.WindowsImageSourceURL != test.expectedWindowsProfile.WindowsImageSourceURL {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.WindowsImageSourceURL, test.expectedWindowsProfile.WindowsImageSourceURL)
+		}
+		if mockAPI.WindowsProfile.WindowsDockerVersion != test.expectedWindowsProfile.WindowsDockerVersion {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.WindowsDockerVersion, test.expectedWindowsProfile.WindowsDockerVersion)
+		}
+		if mockAPI.WindowsProfile.Secrets != nil {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.Secrets, nil)
+		}
+		if mockAPI.WindowsProfile.SSHEnabled != test.expectedWindowsProfile.SSHEnabled {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.SSHEnabled, test.expectedWindowsProfile.SSHEnabled)
+		}
+		if mockAPI.WindowsProfile.EnableAutomaticUpdates != nil {
+			t.Fatalf("setWindowsProfileDefaults() test case %v did not return right default values %v != %v", test.name, mockAPI.WindowsProfile.EnableAutomaticUpdates, nil)
+		}
+	}
+}
+
 func TestIsAzureCNINetworkmonitorAddon(t *testing.T) {
 	mockCS := getMockBaseContainerService("1.10.3")
 	properties := mockCS.Properties
@@ -1569,6 +1706,7 @@ func TestSetCustomCloudProfileDefaults(t *testing.T) {
 			ACIConnectorImageBase:            "ACIConnectorImageBase",
 			NVIDIAImageBase:                  "NVIDIAImageBase",
 			AzureCNIImageBase:                "AzureCNIImageBase",
+			CalicoImageBase:                  "CalicoImageBase",
 			EtcdDownloadURLBase:              "EtcdDownloadURLBase",
 			KubeBinariesSASURLBase:           "KubeBinariesSASURLBase",
 			WindowsTelemetryGUID:             "WindowsTelemetryGUID",
@@ -1620,6 +1758,7 @@ func TestSetCustomCloudProfileDefaults(t *testing.T) {
 			TillerImageBase:                "TillerImageBase",
 			NVIDIAImageBase:                "NVIDIAImageBase",
 			AzureCNIImageBase:              "AzureCNIImageBase",
+			CalicoImageBase:                "CalicoImageBase",
 			EtcdDownloadURLBase:            "EtcdDownloadURLBase",
 			WindowsTelemetryGUID:           "WindowsTelemetryGUID",
 			CNIPluginsDownloadURL:          "CNIPluginsDownloadURL",

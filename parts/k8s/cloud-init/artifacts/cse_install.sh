@@ -17,7 +17,7 @@ removeEtcd() {
 }
 
 removeMoby() {
-    sudo apt-get purge -y moby-engine moby-cli
+    apt-get purge -y moby-engine moby-cli
 }
 
 installEtcd() {
@@ -40,7 +40,13 @@ installDeps() {
     retrycmd_if_failure 60 5 10 dpkg -i /tmp/packages-microsoft-prod.deb || exit $ERR_MS_PROD_DEB_PKG_ADD_FAIL
     apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
     apt_get_dist_upgrade || exit $ERR_APT_DIST_UPGRADE_TIMEOUT
-    apt_get_install 30 1 600 apt-transport-https blobfuse ca-certificates ceph-common cgroup-lite cifs-utils conntrack cracklib-runtime ebtables ethtool fuse git glusterfs-client init-system-helpers iproute2 ipset iptables jq libpam-pwquality libpwquality-tools mount nfs-common pigz socat util-linux xz-utils zip htop iotop iftop sysstat || exit $ERR_APT_INSTALL_TIMEOUT
+    for apt_package in apt-transport-https auditd blobfuse ca-certificates ceph-common cgroup-lite cifs-utils conntrack cracklib-runtime ebtables ethtool fuse git glusterfs-client init-system-helpers iproute2 ipset iptables jq libpam-pwquality libpwquality-tools mount nfs-common pigz socat util-linux xz-utils zip htop iotop iftop sysstat; do
+      apt_get_install 30 1 600 $apt_package
+      if [ $? -ne 0 ]; then
+        journalctl --no-pager -u $apt_package
+        exit $ERR_APT_INSTALL_TIMEOUT
+      fi
+    done
 }
 
 installGPUDrivers() {
@@ -68,7 +74,7 @@ installGPUDrivers() {
 
 installSGXDrivers() {
     echo "Installing SGX driver"
-    local VERSION=`grep DISTRIB_RELEASE /etc/*-release| cut -f 2 -d "="`
+    local VERSION=$(grep DISTRIB_RELEASE /etc/*-release| cut -f 2 -d "=")
     case $VERSION in
     "18.04")
         SGX_DRIVER_URL="https://download.01.org/intel-sgx/dcap-1.0.1/dcap_installer/ubuntuServer1804/sgx_linux_x64_driver_dcap_4f32b98.bin"
@@ -97,16 +103,15 @@ installSGXDrivers() {
 
 installContainerRuntime() {
     if [[ "$CONTAINER_RUNTIME" == "docker" ]]; then
-        if [[ "$DOCKER_ENGINE_REPO" != "" ]]; then
-            installDockerEngine
-        else
-            installMoby
-        fi
-    elif [[ "$CONTAINER_RUNTIME" == "clear-containers" ]]; then
+        installMoby
+    fi
+    if [[ "$CONTAINER_RUNTIME" == "clear-containers" ]]; then
 	    # Ensure we can nest virtualization
         if grep -q vmx /proc/cpuinfo; then
             installClearContainersRuntime
         fi
+    else
+        cleanUpClearContainers
     fi
 }
 
@@ -125,21 +130,6 @@ installMoby() {
     fi
 }
 
-installDockerEngine() {
-    DOCKER_ENGINE_VERSION="1.13.*"
-    dockerd --version
-    if [ $? -eq 0 ]; then
-        echo "dockerd is already installed, skipping download"
-    else
-        retrycmd_if_failure_no_stats 20 1 5 curl -fsSL https://aptdocker.azureedge.net/gpg > /tmp/aptdocker.gpg || exit $ERR_DOCKER_KEY_DOWNLOAD_TIMEOUT
-        retrycmd_if_failure 10 5 10 apt-key add /tmp/aptdocker.gpg || exit $ERR_DOCKER_APT_KEY_TIMEOUT
-        echo "deb ${DOCKER_ENGINE_REPO} ubuntu-xenial main" | sudo tee /etc/apt/sources.list.d/docker.list
-        printf "Package: docker-engine\nPin: version ${DOCKER_ENGINE_VERSION}\nPin-Priority: 550\n" > /etc/apt/preferences.d/docker.pref
-        apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
-        apt_get_install 20 30 120 docker-engine || exit $ERR_DOCKER_INSTALL_TIMEOUT
-    fi
-}
-
 installKataContainersRuntime() {
     # TODO incorporate this into packer CI so that it is pre-baked into the VHD image
     echo "Adding Kata Containers repository key..."
@@ -149,7 +139,7 @@ installKataContainersRuntime() {
     wait_for_apt_locks
     retrycmd_if_failure 30 5 30 apt-key add $KATA_RELEASE_KEY_TMP || exit $ERR_KATA_APT_KEY_TIMEOUT
     echo "Adding Kata Containers repository..."
-    echo 'deb http://download.opensuse.org/repositories/home:/katacontainers:/release/xUbuntu_${UBUNTU_RELEASE}/ /' > /etc/apt/sources.list.d/kata-containers.list
+    echo "deb http://download.opensuse.org/repositories/home:/katacontainers:/release/xUbuntu_${UBUNTU_RELEASE}/ /" > /etc/apt/sources.list.d/kata-containers.list
     echo "Installing Kata Containers runtime..."
     apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
     apt_get_install 120 5 25 kata-runtime || exit $ERR_KATA_INSTALL_TIMEOUT
@@ -290,7 +280,7 @@ installKubeletAndKubectl() {
 pullContainerImage() {
     CLI_TOOL=$1
     DOCKER_IMAGE_URL=$2
-    if [[ ! -z "${PRIVATE_AZURE_REGISTRY_SERVER:-}" ]]; then
+    if [[ -n "${PRIVATE_AZURE_REGISTRY_SERVER:-}" ]]; then
         $CLI_TOOL login -u $SERVICE_PRINCIPAL_CLIENT_ID -p $SERVICE_PRINCIPAL_CLIENT_SECRET $PRIVATE_AZURE_REGISTRY_SERVER
     fi
     retrycmd_if_failure 60 1 1200 $CLI_TOOL pull $DOCKER_IMAGE_URL || exit $ERR_CONTAINER_IMG_PULL_TIMEOUT
@@ -298,8 +288,8 @@ pullContainerImage() {
 
 cleanUpContainerImages() {
     # TODO remove all unused container images at runtime
-    docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v ${KUBERNETES_VERSION} | grep 'hyperkube') &
-    docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v ${KUBERNETES_VERSION} | grep 'cloud-controller-manager') &
+    docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v "${KUBERNETES_VERSION}$" | grep 'hyperkube') &
+    docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v "${KUBERNETES_VERSION}$" | grep 'cloud-controller-manager') &
     if [ "$IS_HOSTED_MASTER" = "false" ]; then
         echo "Cleaning up AKS container images, not an AKS cluster"
         docker rmi $(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'hcp-tunnel-front') &
@@ -310,6 +300,14 @@ cleanUpContainerImages() {
 
 cleanUpGPUDrivers() {
     rm -Rf $GPU_DEST
+}
+
+cleanUpContainerd() {
+    rm -Rf $CONTAINERD_DOWNLOADS_DIR
+}
+
+cleanUpClearContainers() {
+    apt-get purge -y cc-runtime
 }
 
 overrideNetworkConfig() {

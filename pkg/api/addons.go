@@ -196,17 +196,17 @@ func (cs *ContainerService) setAddonsConfig(isUpdate bool) {
 		Name:    ContainerMonitoringAddonName,
 		Enabled: to.BoolPtr(DefaultContainerMonitoringAddonEnabled),
 		Config: map[string]string{
-			"omsAgentVersion":       "1.8.1.256",
-			"dockerProviderVersion": "3.0.0-3",
+			"omsAgentVersion":       "1.10.0.1",
+			"dockerProviderVersion": "4.0.0-0",
 		},
 		Containers: []KubernetesContainerSpec{
 			{
 				Name:           "omsagent",
 				CPURequests:    "50m",
-				MemoryRequests: "200Mi",
+				MemoryRequests: "225Mi",
 				CPULimits:      "150m",
-				MemoryLimits:   "750Mi",
-				Image:          "microsoft/oms:ciprod01092019",
+				MemoryLimits:   "500Mi",
+				Image:          "microsoft/oms:ciprod04232019",
 			},
 		},
 	}
@@ -264,6 +264,33 @@ func (cs *ContainerService) setAddonsConfig(isUpdate bool) {
 		},
 	}
 
+	defaultsCalicoDaemonSetAddonsConfig := KubernetesAddon{
+		Name:    DefaultCalicoDaemonSetAddonName,
+		Enabled: to.BoolPtr(false),
+		Containers: []KubernetesContainerSpec{
+			{
+				Name:  DefaultCalicoDaemonSetAddonName,
+				Image: specConfig.CalicoImageBase + "typha:v3.5.0",
+			},
+			{
+				Name:  "calico-typha",
+				Image: specConfig.CalicoImageBase + "typha:v3.5.0",
+			},
+			{
+				Name:  "calico-cni",
+				Image: specConfig.CalicoImageBase + "cni:v3.5.0",
+			},
+			{
+				Name:  "calico-node",
+				Image: specConfig.CalicoImageBase + "node:v3.5.0",
+			},
+			{
+				Name:  "calico-cluster-proportional-autoscaler",
+				Image: specConfig.KubernetesImageBase + "cluster-proportional-autoscaler-amd64:1.1.2-r2",
+			},
+		},
+	}
+
 	defaultAddons := []KubernetesAddon{
 		defaultsHeapsterAddonsConfig,
 		defaultTillerAddonsConfig,
@@ -281,6 +308,7 @@ func (cs *ContainerService) setAddonsConfig(isUpdate bool) {
 		defaultAzureNetworkPolicyAddonsConfig,
 		defaultIPMasqAgentAddonsConfig,
 		defaultDNSAutoScalerAddonsConfig,
+		defaultsCalicoDaemonSetAddonsConfig,
 	}
 	// Add default addons specification, if no user-provided spec exists
 	if o.KubernetesConfig.Addons == nil {

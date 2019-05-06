@@ -22,6 +22,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DistroValues is a list of currently supported distros
+var DistroValues = []Distro{"", Ubuntu, Ubuntu1804, RHEL, CoreOS, AKS, AKS1804, ACC1604}
+
 // SetPropertiesDefaults for the container Properties, returns true if certs are generated
 func (cs *ContainerService) SetPropertiesDefaults(isUpgrade, isScale bool) (bool, error) {
 	properties := cs.Properties
@@ -57,6 +60,10 @@ func (cs *ContainerService) SetPropertiesDefaults(isUpgrade, isScale bool) (bool
 	// Set hosted master profile defaults if this cluster configuration has a hosted control plane
 	if cs.Properties.HostedMasterProfile != nil {
 		properties.setHostedMasterProfileDefaults()
+	}
+
+	if cs.Properties.WindowsProfile != nil {
+		properties.setWindowsProfileDefaults(isUpgrade, isScale)
 	}
 
 	certsGenerated, _, e := cs.SetDefaultCerts()
@@ -461,6 +468,10 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool) {
 			profile.VMSSOverProvisioningEnabled = to.BoolPtr(DefaultVMSSOverProvisioningEnabled && !isUpgrade && !isScale)
 		}
 
+		if profile.AuditDEnabled == nil {
+			profile.AuditDEnabled = to.BoolPtr(DefaultAuditDEnabled && !isUpgrade && !isScale)
+		}
+
 		if profile.OSType != Windows {
 			if profile.Distro == "" {
 				if p.OrchestratorProfile.IsKubernetes() {
@@ -500,6 +511,25 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool) {
 
 		if profile.EnableVMSSNodePublicIP == nil {
 			profile.EnableVMSSNodePublicIP = to.BoolPtr(DefaultEnableVMSSNodePublicIP)
+		}
+	}
+}
+
+// setWindowsProfileDefaults sets default WindowsProfile values
+func (p *Properties) setWindowsProfileDefaults(isUpgrade, isScale bool) {
+	windowsProfile := p.WindowsProfile
+	if !isUpgrade && !isScale {
+		if windowsProfile.WindowsPublisher == "" {
+			windowsProfile.WindowsPublisher = DefaultWindowsPublisher
+		}
+		if windowsProfile.WindowsOffer == "" {
+			windowsProfile.WindowsOffer = DefaultWindowsOffer
+		}
+		if windowsProfile.WindowsSku == "" {
+			windowsProfile.WindowsSku = DefaultWindowsSku
+		}
+		if windowsProfile.ImageVersion == "" {
+			windowsProfile.ImageVersion = DefaultImageVersion
 		}
 	}
 }

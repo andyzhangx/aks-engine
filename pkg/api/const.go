@@ -23,7 +23,7 @@ const (
 	Linux   OSType = "Linux"
 )
 
-// the LinuxDistros supported by vlabs
+// Distro string consts
 const (
 	Ubuntu          Distro = "ubuntu"
 	Ubuntu1804      Distro = "ubuntu-18.04"
@@ -190,6 +190,8 @@ const (
 	NVIDIADevicePluginAddonName = "nvidia-device-plugin"
 	// ContainerMonitoringAddonName is the name of the kubernetes Container Monitoring addon deployment
 	ContainerMonitoringAddonName = "container-monitoring"
+	// DefaultCalicoDaemonSetAddonName is the name of calico daemonset addon
+	DefaultCalicoDaemonSetAddonName = "calico-daemonset"
 	// IPMASQAgentAddonName is the name of the ip masq agent addon
 	IPMASQAgentAddonName = "ip-masq-agent"
 	// DefaultPrivateClusterEnabled determines the aks-engine provided default for enabling kubernetes Private Cluster
@@ -215,6 +217,8 @@ const (
 	DefaultAcceleratedNetworking = true
 	// DefaultVMSSOverProvisioningEnabled determines the aks-engine provided default for enabling VMSS Overprovisioning
 	DefaultVMSSOverProvisioningEnabled = false
+	// DefaultAuditDEnabled determines the aks-engine provided default for enabling auditd
+	DefaultAuditDEnabled = false
 	// DefaultDNSAutoscalerAddonName is the name of the dns-autoscaler addon
 	DefaultDNSAutoscalerAddonName = "dns-autoscaler"
 	// DefaultUseCosmos determines if the cluster will use cosmos as etcd storage
@@ -228,6 +232,18 @@ const (
 	DefaultPreserveNodesProperties = true
 	// DefaultEnableVMSSNodePublicIP determines the aks-engine provided default for enable VMSS node public IP
 	DefaultEnableVMSSNodePublicIP = false
+)
+
+// WindowsProfile defaults
+const (
+	// DefaultWindowsPublisher sets the default WindowsPublisher value in WindowsProfile
+	DefaultWindowsPublisher = "MicrosoftWindowsServer"
+	// DefaultWindowsOffer sets the default WindowsOffer value in WindowsProfile
+	DefaultWindowsOffer = "WindowsServerSemiAnnual"
+	// DefaultWindowsSku sets the default WindowsSku value in WindowsProfile
+	DefaultWindowsSku = "Datacenter-Core-1809-with-Containers-smalldisk"
+	// DefaultImageVersion sets the default ImageVersion value in WindowsProfile
+	DefaultImageVersion = "1809.0.20190314"
 )
 
 const (
@@ -274,11 +290,11 @@ const (
 	// AzureCniPluginVerLinux specifies version of Azure CNI plugin, which has been mirrored from
 	// https://github.com/Azure/azure-container-networking/releases/download/${AZURE_PLUGIN_VER}/azure-vnet-cni-linux-amd64-${AZURE_PLUGIN_VER}.tgz
 	// to https://acs-mirror.azureedge.net/cni
-	AzureCniPluginVerLinux = "v1.0.18"
+	AzureCniPluginVerLinux = "v1.0.22"
 	// AzureCniPluginVerWindows specifies version of Azure CNI plugin, which has been mirrored from
 	// https://github.com/Azure/azure-container-networking/releases/download/${AZURE_PLUGIN_VER}/azure-vnet-cni-windows-amd64-${AZURE_PLUGIN_VER}.zip
 	// to https://acs-mirror.azureedge.net/cni
-	AzureCniPluginVerWindows = "v1.0.18"
+	AzureCniPluginVerWindows = "v1.0.22"
 	// CNIPluginVer specifies the version of CNI implementation
 	// https://github.com/containernetworking/plugins
 	CNIPluginVer = "v0.7.5"
@@ -385,7 +401,7 @@ const (
 	// DefaultJumpboxUsername specifies the default admin username for the private cluster jumpbox
 	DefaultJumpboxUsername = "azureuser"
 	// DefaultKubeletPodMaxPIDs specifies the default max pid authorized by pods
-	DefaultKubeletPodMaxPIDs = 100
+	DefaultKubeletPodMaxPIDs = -1
 	// DefaultKubernetesAgentSubnetVMSS specifies the default subnet for agents when master is VMSS
 	DefaultKubernetesAgentSubnetVMSS = "10.248.0.0/13"
 	// DefaultKubernetesClusterSubnet specifies the default subnet for pods.

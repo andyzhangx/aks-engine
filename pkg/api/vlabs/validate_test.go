@@ -2486,6 +2486,18 @@ func TestAgentPoolProfile_ValidateAvailabilityProfile(t *testing.T) {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
 	})
+
+	t.Run("Should fail for AvailabilitySet + invalid LoadBalancerBackendAddressPoolIDs", func(t *testing.T) {
+		t.Parallel()
+		cs := getK8sDefaultContainerService(false)
+		agentPoolProfiles := cs.Properties.AgentPoolProfiles
+		agentPoolProfiles[0].AvailabilityProfile = AvailabilitySet
+		agentPoolProfiles[0].LoadBalancerBackendAddressPoolIDs = []string{"/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/myVMSSSLB/backendAddressPools/myVMSSSLBBEPool", ""}
+		expectedMsg := fmt.Sprintf("AgentPoolProfile.LoadBalancerBackendAddressPoolIDs can not contain empty string. Agent pool name: %s", agentPoolProfiles[0].Name)
+		if err := cs.Properties.validateAgentPoolProfiles(false); err.Error() != expectedMsg {
+			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
+		}
+	})
 }
 
 func TestAgentPoolProfile_ValidateVirtualMachineScaleSet(t *testing.T) {
@@ -2577,6 +2589,64 @@ func TestAgentPoolProfile_ValidateVirtualMachineScaleSet(t *testing.T) {
 		expectedMsg := fmt.Sprintf("mixed mode availability profiles are not allowed. Please set either VirtualMachineScaleSets or AvailabilitySet in availabilityProfile for all agent pools")
 		if err := cs.Properties.validateAgentPoolProfiles(false); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
+		}
+	})
+
+	t.Run("Should fail for VMSS + invalid LoadBalancerBackendAddressPoolIDs", func(t *testing.T) {
+		t.Parallel()
+		cs := getK8sDefaultContainerService(false)
+		agentPoolProfiles := cs.Properties.AgentPoolProfiles
+		agentPoolProfiles[0].AvailabilityProfile = VirtualMachineScaleSets
+		agentPoolProfiles[0].LoadBalancerBackendAddressPoolIDs = []string{"/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/myVMSSSLB/backendAddressPools/myVMSSSLBBEPool", ""}
+		expectedMsg := fmt.Sprintf("AgentPoolProfile.LoadBalancerBackendAddressPoolIDs can not contain empty string. Agent pool name: %s", agentPoolProfiles[0].Name)
+		if err := cs.Properties.validateAgentPoolProfiles(false); err.Error() != expectedMsg {
+			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
+		}
+	})
+}
+
+func TestAgentPoolProfile_ValidateAuditDEnabled(t *testing.T) {
+	t.Run("Should have proper validation for auditd + distro combinations", func(t *testing.T) {
+		t.Parallel()
+		for _, distro := range DistroValues {
+			cs := getK8sDefaultContainerService(false)
+			agentPoolProfiles := cs.Properties.AgentPoolProfiles
+			agentPoolProfiles[0].Distro = distro
+			agentPoolProfiles[0].AuditDEnabled = to.BoolPtr(true)
+			switch distro {
+			case RHEL, CoreOS:
+				expectedMsg := fmt.Sprintf("You have enabled auditd in agent pool %s, but you did not specify an Ubuntu-based distro", agentPoolProfiles[0].Name)
+				if err := cs.Properties.validateAgentPoolProfiles(false); err.Error() != expectedMsg {
+					t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
+				}
+			case Ubuntu, Ubuntu1804, AKS, AKS1804, ACC1604:
+				if err := cs.Properties.validateAgentPoolProfiles(false); err != nil {
+					t.Errorf("AuditDEnabled should work with distro %s, got error %s", distro, err.Error())
+				}
+			}
+		}
+	})
+}
+
+func TestMasterProfile_ValidateAuditDEnabled(t *testing.T) {
+	t.Run("Should have proper validation for auditd + distro combinations", func(t *testing.T) {
+		t.Parallel()
+		for _, distro := range DistroValues {
+			cs := getK8sDefaultContainerService(false)
+			masterProfile := cs.Properties.MasterProfile
+			masterProfile.Distro = distro
+			masterProfile.AuditDEnabled = to.BoolPtr(true)
+			switch distro {
+			case RHEL, CoreOS:
+				expectedMsg := fmt.Sprintf("You have enabled auditd for master vms, but you did not specify an Ubuntu-based distro.")
+				if err := cs.Properties.validateMasterProfile(false); err.Error() != expectedMsg {
+					t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
+				}
+			case Ubuntu, Ubuntu1804, AKS, AKS1804, ACC1604:
+				if err := cs.Properties.validateMasterProfile(false); err != nil {
+					t.Errorf("AuditDEnabled should work with distro %s, got error %s", distro, err.Error())
+				}
+			}
 		}
 	})
 }

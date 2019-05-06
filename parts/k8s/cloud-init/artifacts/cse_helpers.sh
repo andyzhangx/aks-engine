@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #ERR_SYSTEMCTL_ENABLE_FAIL=3 # Service could not be enabled by systemctl -- DEPRECATED
 ERR_SYSTEMCTL_START_FAIL=4 # Service could not be started or enabled by systemctl
@@ -51,6 +51,8 @@ ERR_SYSCTL_RELOAD=103 # Error reloading sysctl config
 ERR_CIS_ASSIGN_ROOT_PW=111 # Error assigning root password in CIS enforcement
 ERR_CIS_ASSIGN_FILE_PERMISSION=112 # Error assigning permission to a file in CIS enforcement
 ERR_CIS_COPY_FILE=113 # Error writing a file to disk for CIS enforcement
+ERR_CIS_APPLY_GRUB_CONFIG=114 # Error applying CIS-recommended grub configuration
+ERR_CIS_APPLY_PASSWORD_CONFIG=115 # Error applying CIS-recommended passwd configuration
 
 OS=$(cat /etc/*-release | grep ^ID= | tr -d 'ID="' | awk '{print toupper($0)}')
 UBUNTU_OS_NAME="UBUNTU"
@@ -209,6 +211,19 @@ systemctl_restart() {
     for i in $(seq 1 $retries); do
         timeout $timeout systemctl daemon-reload
         timeout $timeout systemctl restart $svcname
+        [ $? -eq 0  ] && break || \
+        if [ $i -eq $retries ]; then
+            return 1
+        else
+            sleep $wait_sleep
+        fi
+    done
+}
+systemctl_stop() {
+    retries=$1; wait_sleep=$2; timeout=$3 svcname=$4
+    for i in $(seq 1 $retries); do
+        timeout $timeout systemctl daemon-reload
+        timeout $timeout systemctl stop $svcname
         [ $? -eq 0  ] && break || \
         if [ $i -eq $retries ]; then
             return 1

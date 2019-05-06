@@ -460,6 +460,7 @@ type MasterProfile struct {
 	AgentSubnet              string            `json:"agentSubnet,omitempty"`
 	AvailabilityZones        []string          `json:"availabilityZones,omitempty"`
 	SinglePlacementGroup     *bool             `json:"singlePlacementGroup,omitempty"`
+	AuditDEnabled            *bool             `json:"auditDEnabled,omitempty"`
 
 	// Master LB public endpoint/FQDN with port
 	// The format will be FQDN:2376
@@ -533,6 +534,8 @@ type AgentPoolProfile struct {
 	PreserveNodesProperties             *bool                `json:"preserveNodesProperties,omitempty"`
 	WindowsNameVersion                  string               `json:"windowsNameVersion,omitempty"`
 	EnableVMSSNodePublicIP              *bool                `json:"enableVMSSNodePublicIP,omitempty"`
+	LoadBalancerBackendAddressPoolIDs   []string             `json:"loadBalancerBackendAddressPoolIDs,omitempty"`
+	AuditDEnabled                       *bool                `json:"auditDEnabled,omitempty"`
 }
 
 // AgentPoolProfileRole represents an agent role
@@ -820,7 +823,8 @@ func (p *Properties) K8sOrchestratorName() string {
 	return ""
 }
 
-func (p *Properties) getAgentPoolIndexByName(name string) int {
+// GetAgentPoolIndexByName returns the index of the provided agentpool.
+func (p *Properties) GetAgentPoolIndexByName(name string) int {
 	index := -1
 	for i, profile := range p.AgentPoolProfiles {
 		if profile.Name == name {
@@ -831,9 +835,8 @@ func (p *Properties) getAgentPoolIndexByName(name string) int {
 	return index
 }
 
-// GetAgentVMPrefix returns the VM prefix for an agentpool
-func (p *Properties) GetAgentVMPrefix(a *AgentPoolProfile) string {
-	index := p.getAgentPoolIndexByName(a.Name)
+// GetAgentVMPrefix returns the VM prefix for an agentpool.
+func (p *Properties) GetAgentVMPrefix(a *AgentPoolProfile, index int) string {
 	nameSuffix := p.GetClusterID()
 	vmPrefix := ""
 	if index != -1 {
@@ -911,7 +914,7 @@ func (p *Properties) GetPrimaryAvailabilitySetName() string {
 func (p *Properties) GetPrimaryScaleSetName() string {
 	if len(p.AgentPoolProfiles) > 0 {
 		if p.AgentPoolProfiles[0].AvailabilityProfile == VirtualMachineScaleSets {
-			return p.GetAgentVMPrefix(p.AgentPoolProfiles[0])
+			return p.GetAgentVMPrefix(p.AgentPoolProfiles[0], 0)
 		}
 	}
 	return ""
@@ -1045,7 +1048,55 @@ func (p *Properties) IsUbuntuDistroForAllNodes() bool {
 			}
 		}
 	}
-	return p.MasterProfile.Distro == Ubuntu || p.MasterProfile.Distro == Ubuntu1804
+	if p.MasterProfile != nil {
+		return p.MasterProfile.Distro == Ubuntu || p.MasterProfile.Distro == Ubuntu1804
+	}
+	return true
+}
+
+// HasUbuntuDistroNodes returns true if any of the agent pools or masters are running the base Ubuntu image
+func (p *Properties) HasUbuntuDistroNodes() bool {
+	if len(p.AgentPoolProfiles) > 0 {
+		for _, ap := range p.AgentPoolProfiles {
+			if ap.Distro == Ubuntu || ap.Distro == Ubuntu1804 {
+				return true
+			}
+		}
+	}
+	if p.MasterProfile != nil {
+		return p.MasterProfile.Distro == Ubuntu || p.MasterProfile.Distro == Ubuntu1804
+	}
+	return false
+}
+
+// HasUbuntu1604DistroNodes returns true if any of the agent pools or masters are running the base Ubuntu 16.04-LTS image
+func (p *Properties) HasUbuntu1604DistroNodes() bool {
+	if len(p.AgentPoolProfiles) > 0 {
+		for _, ap := range p.AgentPoolProfiles {
+			if ap.Distro == Ubuntu {
+				return true
+			}
+		}
+	}
+	if p.MasterProfile != nil {
+		return p.MasterProfile.Distro == Ubuntu
+	}
+	return false
+}
+
+// HasUbuntu1804DistroNodes returns true if any of the agent pools or masters are running the base Ubuntu 18.04-LTS image
+func (p *Properties) HasUbuntu1804DistroNodes() bool {
+	if len(p.AgentPoolProfiles) > 0 {
+		for _, ap := range p.AgentPoolProfiles {
+			if ap.Distro == Ubuntu1804 {
+				return true
+			}
+		}
+	}
+	if p.MasterProfile != nil {
+		return p.MasterProfile.Distro == Ubuntu1804
+	}
+	return false
 }
 
 // HasAvailabilityZones returns true if the cluster contains a profile with zones

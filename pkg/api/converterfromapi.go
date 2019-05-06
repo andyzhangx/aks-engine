@@ -147,6 +147,7 @@ func ConvertOrchestratorVersionProfileToV20170930(api *OrchestratorVersionProfil
 		for i, h := range api.Upgrades {
 			vProfile.Upgrades[i] = &v20170930.OrchestratorProfile{
 				OrchestratorVersion: h.OrchestratorVersion,
+				OrchestratorType:    h.OrchestratorType,
 			}
 		}
 	}
@@ -933,6 +934,7 @@ func convertMasterProfileToVLabs(api *MasterProfile, vlabsProfile *vlabs.MasterP
 	vlabsProfile.AvailabilityZones = api.AvailabilityZones
 	vlabsProfile.SinglePlacementGroup = api.SinglePlacementGroup
 	vlabsProfile.CosmosEtcd = api.CosmosEtcd
+	vlabsProfile.AuditDEnabled = api.AuditDEnabled
 	convertCustomFilesToVlabs(api, vlabsProfile)
 }
 
@@ -1017,6 +1019,8 @@ func convertAgentPoolProfileToVLabs(api *AgentPoolProfile, p *vlabs.AgentPoolPro
 	p.AvailabilityZones = api.AvailabilityZones
 	p.SinglePlacementGroup = api.SinglePlacementGroup
 	p.EnableVMSSNodePublicIP = api.EnableVMSSNodePublicIP
+	p.LoadBalancerBackendAddressPoolIDs = api.LoadBalancerBackendAddressPoolIDs
+	p.AuditDEnabled = api.AuditDEnabled
 
 	for k, v := range api.CustomNodeLabels {
 		p.CustomNodeLabels[k] = v
@@ -1240,6 +1244,7 @@ func convertAzureEnvironmentSpecConfigToVLabs(api *AzureEnvironmentSpecConfig, v
 		ACIConnectorImageBase:            api.KubernetesSpecConfig.ACIConnectorImageBase,
 		NVIDIAImageBase:                  api.KubernetesSpecConfig.NVIDIAImageBase,
 		AzureCNIImageBase:                api.KubernetesSpecConfig.AzureCNIImageBase,
+		CalicoImageBase:                  api.KubernetesSpecConfig.CalicoImageBase,
 		EtcdDownloadURLBase:              api.KubernetesSpecConfig.EtcdDownloadURLBase,
 		KubeBinariesSASURLBase:           api.KubernetesSpecConfig.KubeBinariesSASURLBase,
 		WindowsTelemetryGUID:             api.KubernetesSpecConfig.WindowsTelemetryGUID,

@@ -373,6 +373,12 @@ func (a *Properties) validateMasterProfile(isUpdate bool) error {
 		return errors.Errorf("The %s distro is not supported", m.Distro)
 	}
 
+	if to.Bool(m.AuditDEnabled) {
+		if !m.IsUbuntu() {
+			return errors.Errorf("You have enabled auditd for master vms, but you did not specify an Ubuntu-based distro.")
+		}
+	}
+
 	return common.ValidateDNSPrefix(m.DNSPrefix)
 }
 
@@ -404,6 +410,12 @@ func (a *Properties) validateAgentPoolProfiles(isUpdate bool) error {
 		if to.Bool(agentPoolProfile.VMSSOverProvisioningEnabled) {
 			if agentPoolProfile.AvailabilityProfile != VirtualMachineScaleSets {
 				return errors.Errorf("You have specified VMSS Overprovisioning in agent pool %s, but you did not specify VMSS", agentPoolProfile.Name)
+			}
+		}
+
+		if to.Bool(agentPoolProfile.AuditDEnabled) {
+			if !agentPoolProfile.IsUbuntu() {
+				return errors.Errorf("You have enabled auditd in agent pool %s, but you did not specify an Ubuntu-based distro", agentPoolProfile.Name)
 			}
 		}
 
@@ -463,6 +475,10 @@ func (a *Properties) validateAgentPoolProfiles(isUpdate bool) error {
 		}
 
 		if e := agentPoolProfile.validateWindows(a.OrchestratorProfile, a.WindowsProfile, isUpdate); agentPoolProfile.OSType == Windows && e != nil {
+			return e
+		}
+
+		if e := agentPoolProfile.validateLoadBalancerBackendAddressPoolIDs(); e != nil {
 			return e
 		}
 	}
@@ -915,6 +931,19 @@ func (a *AgentPoolProfile) validateOrchestratorSpecificProperties(orchestratorTy
 			return errors.Errorf("VirtualMachineScaleSets does not support storage account attached disks.  Instead specify 'StorageAccount': '%s' or specify AvailabilityProfile '%s'", ManagedDisks, AvailabilitySet)
 		}
 	}
+	return nil
+}
+
+func (a *AgentPoolProfile) validateLoadBalancerBackendAddressPoolIDs() error {
+
+	if a.LoadBalancerBackendAddressPoolIDs != nil {
+		for _, backendPoolID := range a.LoadBalancerBackendAddressPoolIDs {
+			if len(backendPoolID) == 0 {
+				return errors.Errorf("AgentPoolProfile.LoadBalancerBackendAddressPoolIDs can not contain empty string. Agent pool name: %s", a.Name)
+			}
+		}
+	}
+
 	return nil
 }
 
