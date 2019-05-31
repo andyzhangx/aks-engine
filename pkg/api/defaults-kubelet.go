@@ -25,6 +25,8 @@ func (cs *ContainerService) setKubeletConfig() {
 		"--cgroups-per-qos":             "true",
 		"--kubeconfig":                  "/var/lib/kubelet/kubeconfig",
 		"--keep-terminated-pod-volumes": "false",
+		"--tls-cert-file":               "/etc/kubernetes/certs/kubeletserver.crt",
+		"--tls-private-key-file":        "/etc/kubernetes/certs/kubeletserver.key",
 	}
 
 	// Start with copy of Linux config
@@ -126,7 +128,7 @@ func (cs *ContainerService) setKubeletConfig() {
 		}
 	}
 
-	removeKubeletFlags(o.KubernetesConfig.KubeletConfig, o.OrchestratorVersion)
+	removeKubeletFlags(o.KubernetesConfig.KubeletConfig, o.OrchestratorVersion, Linux)
 
 	// Master-specific kubelet config changes go here
 	if cs.Properties.MasterProfile != nil {
@@ -137,7 +139,7 @@ func (cs *ContainerService) setKubeletConfig() {
 		setMissingKubeletValues(cs.Properties.MasterProfile.KubernetesConfig, o.KubernetesConfig.KubeletConfig)
 		addDefaultFeatureGates(cs.Properties.MasterProfile.KubernetesConfig.KubeletConfig, o.OrchestratorVersion, "", "")
 
-		removeKubeletFlags(cs.Properties.MasterProfile.KubernetesConfig.KubeletConfig, o.OrchestratorVersion)
+		removeKubeletFlags(cs.Properties.MasterProfile.KubernetesConfig.KubeletConfig, o.OrchestratorVersion, Linux)
 	}
 
 	// Agent-specific kubelet config changes go here
@@ -167,11 +169,11 @@ func (cs *ContainerService) setKubeletConfig() {
 			}
 		}
 
-		removeKubeletFlags(profile.KubernetesConfig.KubeletConfig, o.OrchestratorVersion)
+		removeKubeletFlags(profile.KubernetesConfig.KubeletConfig, o.OrchestratorVersion, profile.OSType)
 	}
 }
 
-func removeKubeletFlags(k map[string]string, v string) {
+func removeKubeletFlags(k map[string]string, v string, osType OSType) {
 	// Get rid of values not supported until v1.10
 	if !common.IsKubernetesVersionGe(v, "1.10.0") {
 		for _, key := range []string{"--pod-max-pids"} {
@@ -196,6 +198,12 @@ func removeKubeletFlags(k map[string]string, v string) {
 	// Get rid of keys with empty string values
 	for key, val := range k {
 		if val == "" {
+			delete(k, key)
+		}
+	}
+
+	if osType == Windows {
+		for _, key := range []string{"--tls-cert-file", "--tls-private-key-file"} {
 			delete(k, key)
 		}
 	}
