@@ -49,18 +49,16 @@ if [[ ${UBUNTU_RELEASE} == "18.04" ]]; then
   overrideNetworkConfig
 fi
 
-ETCD_VERSION="3.2.25"
+ETCD_VERSION="3.2.26"
 ETCD_DOWNLOAD_URL="https://acs-mirror.azureedge.net/github-coreos"
 installEtcd
 echo "  - etcd v${ETCD_VERSION}" >> ${RELEASE_NOTES_FILEPATH}
 
-MOBY_VERSION="3.0.4"
+MOBY_VERSION="3.0.6"
 installMoby
 echo "  - moby v${MOBY_VERSION}" >> ${RELEASE_NOTES_FILEPATH}
 installGPUDrivers
 echo "  - nvidia-docker2 nvidia-container-runtime" >> ${RELEASE_NOTES_FILEPATH}
-
-installClearContainersRuntime
 
 VNET_CNI_VERSIONS="
 1.0.22
@@ -113,6 +111,7 @@ for EXECHEALTHZ_VERSION in ${EXECHEALTHZ_VERSIONS}; do
 done
 
 ADDON_RESIZER_VERSIONS="
+1.8.5
 1.8.4
 1.8.1
 1.7
@@ -153,7 +152,9 @@ for KUBE_DNS_VERSION in ${KUBE_DNS_VERSIONS}; do
 done
 
 KUBE_ADDON_MANAGER_VERSIONS="
+9.0.1
 9.0
+8.9.1
 8.9
 8.8
 8.7
@@ -179,9 +180,9 @@ done
 
 PAUSE_VERSIONS="3.1"
 for PAUSE_VERSION in ${PAUSE_VERSIONS}; do
-    # Image 'msazurestackdocker/pause-amd64' is the same as 'k8s.gcr.io/pause-amd64'
-    # At the time, re-tagging and pushing to docker hub seemed simpler than changing how `defaults-kubelet.go` sets `--pod-infra-container-image`
-    for IMAGE_BASE in k8s.gcr.io msazurestackdocker; do
+    # Image 'mcr.microsoft.com/k8s/azurestack/core/pause-amd64' is the same as 'k8s.gcr.io/pause-amd64'
+    # At the time, re-tagging and pushing to mcr hub seemed simpler than changing how `defaults-kubelet.go` sets `--pod-infra-container-image`
+    for IMAGE_BASE in k8s.gcr.io mcr.microsoft.com/k8s/azurestack/core; do
       CONTAINER_IMAGE="${IMAGE_BASE}/pause-amd64:${PAUSE_VERSION}"
       pullContainerImage "docker" ${CONTAINER_IMAGE}
       echo "  - ${CONTAINER_IMAGE}" >> ${RELEASE_NOTES_FILEPATH}
@@ -199,17 +200,22 @@ for TILLER_VERSION in ${TILLER_VERSIONS}; do
 done
 
 CLUSTER_AUTOSCALER_VERSIONS="
+1.15.0
+1.14.2
 1.14.0
+1.13.4
 1.13.2
 1.13.1
+1.12.5
 1.12.3
 1.12.2
+1.3.9
 1.3.8
 1.3.7
 1.3.4
 1.3.3
+1.2.5
 1.2.2
-1.1.2
 "
 for CLUSTER_AUTOSCALER_VERSION in ${CLUSTER_AUTOSCALER_VERSIONS}; do
     CONTAINER_IMAGE="k8s.gcr.io/cluster-autoscaler:v${CLUSTER_AUTOSCALER_VERSION}"
@@ -220,7 +226,6 @@ done
 K8S_DNS_SIDECAR_VERSIONS="
 1.14.10
 1.14.8
-1.14.7
 "
 for K8S_DNS_SIDECAR_VERSION in ${K8S_DNS_SIDECAR_VERSIONS}; do
     CONTAINER_IMAGE="k8s.gcr.io/k8s-dns-sidecar-amd64:${K8S_DNS_SIDECAR_VERSION}"
@@ -229,6 +234,7 @@ for K8S_DNS_SIDECAR_VERSION in ${K8S_DNS_SIDECAR_VERSIONS}; do
 done
 
 CORE_DNS_VERSIONS="
+1.5.0
 1.3.1
 1.2.6
 1.2.2
@@ -312,7 +318,10 @@ for BLOBFUSE_FLEXVOLUME_VERSION in ${BLOBFUSE_FLEXVOLUME_VERSIONS}; do
     echo "  - ${CONTAINER_IMAGE}" >> ${RELEASE_NOTES_FILEPATH}
 done
 
-IP_MASQ_AGENT_VERSIONS="2.0.0"
+IP_MASQ_AGENT_VERSIONS="
+2.3.0
+2.0.0
+"
 for IP_MASQ_AGENT_VERSION in ${IP_MASQ_AGENT_VERSIONS}; do
     # TODO remove the gcr.io/google-containers image once AKS switches to use k8s.gcr.io
     DEPRECATED_CONTAINER_IMAGE="gcr.io/google-containers/ip-masq-agent-amd64:v${IP_MASQ_AGENT_VERSION}"
@@ -343,7 +352,7 @@ FLANNEL_VERSIONS="
 0.8.0
 "
 for FLANNEL_VERSION in ${FLANNEL_VERSIONS}; do
-    CONTAINER_IMAGE="quay.io/coreos/flannel:v${FLANNEL_VERSION}"
+    CONTAINER_IMAGE="quay.io/coreos/flannel:v${FLANNEL_VERSION}-amd64"
     pullContainerImage "docker" ${CONTAINER_IMAGE}
     echo "  - ${CONTAINER_IMAGE}" >> ${RELEASE_NOTES_FILEPATH}
 done
@@ -353,26 +362,29 @@ echo "  - busybox" >> ${RELEASE_NOTES_FILEPATH}
 
 # TODO: fetch supported k8s versions from an aks-engine command instead of hardcoding them here
 K8S_VERSIONS="
-1.14.1
-1.14.0
-1.13.5
-1.13.4
+1.15.0
+1.14.4
+1.14.4-azs
+1.14.3
+1.14.3-azs
+1.13.8
+1.13.8-azs
+1.13.7
+1.13.7-azs
 1.12.8
+1.12.8-azs
 1.12.7
 1.12.7-azs
 1.11.10
+1.11.10-azs
 1.11.9
 1.11.9-azs
-1.11.8
-1.11.8-azs
 1.10.13
 1.10.12
-1.9.11
-1.9.10
 "
 for KUBERNETES_VERSION in ${K8S_VERSIONS}; do
     if [[ $KUBERNETES_VERSION == *"azs"* ]]; then
-      HYPERKUBE_URL="msazurestackdocker/hyperkube-amd64:v${KUBERNETES_VERSION}"
+      HYPERKUBE_URL="mcr.microsoft.com/k8s/azurestack/core/hyperkube-amd64:v${KUBERNETES_VERSION}"
     else
       HYPERKUBE_URL="k8s.gcr.io/hyperkube-amd64:v${KUBERNETES_VERSION}"
       CONTAINER_IMAGE="k8s.gcr.io/cloud-controller-manager-amd64:v${KUBERNETES_VERSION}"

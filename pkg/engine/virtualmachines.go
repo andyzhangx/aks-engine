@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
-func CreateVirtualMachine(cs *api.ContainerService) VirtualMachineARM {
+func CreateMasterVM(cs *api.ContainerService) VirtualMachineARM {
 	hasAvailabilityZones := cs.Properties.MasterProfile.HasAvailabilityZones()
 	isStorageAccount := cs.Properties.MasterProfile.IsStorageAccount()
 	kubernetesConfig := cs.Properties.OrchestratorProfile.KubernetesConfig
@@ -56,6 +56,8 @@ func CreateVirtualMachine(cs *api.ContainerService) VirtualMachineARM {
 		},
 		Type: to.StringPtr("Microsoft.Compute/virtualMachines"),
 	}
+
+	addCustomTagsToVM(cs.Properties.MasterProfile.CustomVMTags, &virtualMachine)
 
 	if hasAvailabilityZones {
 		virtualMachine.Zones = &[]string{
@@ -147,25 +149,30 @@ func CreateVirtualMachine(cs *api.ContainerService) VirtualMachineARM {
 
 	storageProfile := &compute.StorageProfile{}
 	imageRef := cs.Properties.MasterProfile.ImageRef
-	useMasterCustomImage := imageRef != nil && len(imageRef.Name) > 0 && len(imageRef.ResourceGroup) > 0
 	etcdSizeGB, _ := strconv.Atoi(kubernetesConfig.EtcdDiskSizeGB)
-	dataDisk := compute.DataDisk{
-		CreateOption: compute.DiskCreateOptionTypesEmpty,
-		DiskSizeGB:   to.Int32Ptr(int32(etcdSizeGB)),
-		Lun:          to.Int32Ptr(0),
-		Name:         to.StringPtr("[concat(variables('masterVMNamePrefix'), copyIndex(variables('masterOffset')),'-etcddisk')]"),
-	}
-	if cs.Properties.MasterProfile.IsStorageAccount() {
-		dataDisk.Vhd = &compute.VirtualHardDisk{
-			URI: to.StringPtr("[concat(reference(concat('Microsoft.Storage/storageAccounts/',variables('masterStorageAccountName')),variables('apiVersionStorage')).primaryEndpoints.blob,'vhds/', variables('masterVMNamePrefix'),copyIndex(variables('masterOffset')),'-etcddisk.vhd')]"),
+	if !cs.Properties.MasterProfile.HasCosmosEtcd() {
+		dataDisk := compute.DataDisk{
+			CreateOption: compute.DiskCreateOptionTypesEmpty,
+			DiskSizeGB:   to.Int32Ptr(int32(etcdSizeGB)),
+			Lun:          to.Int32Ptr(0),
+			Name:         to.StringPtr("[concat(variables('masterVMNamePrefix'), copyIndex(variables('masterOffset')),'-etcddisk')]"),
+		}
+		if cs.Properties.MasterProfile.IsStorageAccount() {
+			dataDisk.Vhd = &compute.VirtualHardDisk{
+				URI: to.StringPtr("[concat(reference(concat('Microsoft.Storage/storageAccounts/',variables('masterStorageAccountName')),variables('apiVersionStorage')).primaryEndpoints.blob,'vhds/', variables('masterVMNamePrefix'),copyIndex(variables('masterOffset')),'-etcddisk.vhd')]"),
+			}
+		}
+		storageProfile.DataDisks = &[]compute.DataDisk{
+			dataDisk,
 		}
 	}
-	storageProfile.DataDisks = &[]compute.DataDisk{
-		dataDisk,
-	}
 	imgReference := &compute.ImageReference{}
-	if useMasterCustomImage {
-		imgReference.ID = to.StringPtr("[resourceId(parameters('osImageResourceGroup'), 'Microsoft.Compute/images', parameters('osImageName'))]")
+	if cs.Properties.MasterProfile.HasImageRef() {
+		if cs.Properties.MasterProfile.HasImageGallery() {
+			imgReference.ID = to.StringPtr(fmt.Sprintf("[concat('/subscriptions/', '%s', '/resourceGroups/', parameters('osImageResourceGroup'), '/providers/Microsoft.Compute/galleries/', '%s', '/images/', parameters('osImageName'), '/versions/', '%s')]", imageRef.SubscriptionID, imageRef.Gallery, imageRef.Version))
+		} else {
+			imgReference.ID = to.StringPtr("[resourceId(parameters('osImageResourceGroup'), 'Microsoft.Compute/images', parameters('osImageName'))]")
+		}
 	} else {
 		imgReference.Offer = to.StringPtr("[parameters('osImageOffer')]")
 		imgReference.Publisher = to.StringPtr("[parameters('osImagePublisher')]")
@@ -361,6 +368,8 @@ func createAgentAvailabilitySetVM(cs *api.ContainerService, profile *api.AgentPo
 		Tags: tags,
 	}
 
+	addCustomTagsToVM(profile.CustomVMTags, &virtualMachine)
+
 	if useManagedIdentity {
 		if userAssignedIDEnabled && !profile.IsWindows() {
 			virtualMachine.Identity = &compute.VirtualMachineIdentity{
@@ -469,10 +478,15 @@ func createAgentAvailabilitySetVM(cs *api.ContainerService, profile *api.AgentPo
 
 	} else {
 		imageRef := profile.ImageRef
-		useAgentCustomImage := imageRef != nil && len(imageRef.Name) > 0 && len(imageRef.ResourceGroup) > 0
-		if useAgentCustomImage {
-			storageProfile.ImageReference = &compute.ImageReference{
-				ID: to.StringPtr(fmt.Sprintf("[resourceId(variables('%[1]sosImageResourceGroup'), 'Microsoft.Compute/images', variables('%[1]sosImageName'))]", profile.Name)),
+		if profile.HasImageRef() {
+			if profile.HasImageGallery() {
+				storageProfile.ImageReference = &compute.ImageReference{
+					ID: to.StringPtr(fmt.Sprintf("[concat('/subscriptions/', '%s', '/resourceGroups/', parameters('%sosImageResourceGroup'), '/providers/Microsoft.Compute/galleries/', '%s', '/images/', parameters('%sosImageName'), '/versions/', '%s')]", imageRef.SubscriptionID, profile.Name, imageRef.Gallery, profile.Name, imageRef.Version)),
+				}
+			} else {
+				storageProfile.ImageReference = &compute.ImageReference{
+					ID: to.StringPtr(fmt.Sprintf("[resourceId(variables('%[1]sosImageResourceGroup'), 'Microsoft.Compute/images', variables('%[1]sosImageName'))]", profile.Name)),
+				}
 			}
 		} else {
 			storageProfile.ImageReference = &compute.ImageReference{
@@ -562,4 +576,13 @@ func getVaultSecretGroup(linuxProfile *api.LinuxProfile) []compute.VaultSecretGr
 		}
 	}
 	return vaultSecretGroups
+}
+
+func addCustomTagsToVM(tags map[string]string, vm *compute.VirtualMachine) {
+	for key, value := range tags {
+		_, found := vm.Tags[key]
+		if !found {
+			vm.Tags[key] = &value
+		}
+	}
 }

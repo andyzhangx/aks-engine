@@ -898,6 +898,7 @@ func convertMasterProfileToV20170701(api *MasterProfile, v20170701Profile *v2017
 func convertMasterProfileToVLabs(api *MasterProfile, vlabsProfile *vlabs.MasterProfile) {
 	vlabsProfile.Count = api.Count
 	vlabsProfile.DNSPrefix = api.DNSPrefix
+	vlabsProfile.CustomVMTags = api.CustomVMTags
 	vlabsProfile.SubjectAltNames = api.SubjectAltNames
 	vlabsProfile.VMSize = api.VMSize
 	vlabsProfile.OSDiskSizeGB = api.OSDiskSizeGB
@@ -906,6 +907,7 @@ func convertMasterProfileToVLabs(api *MasterProfile, vlabsProfile *vlabs.MasterP
 	vlabsProfile.FirstConsecutiveStaticIP = api.FirstConsecutiveStaticIP
 	vlabsProfile.VnetCidr = api.VnetCidr
 	vlabsProfile.SetSubnet(api.Subnet)
+	vlabsProfile.SetSubnetIPv6(api.SubnetIPv6)
 	vlabsProfile.FQDN = api.FQDN
 	vlabsProfile.StorageProfile = api.StorageProfile
 	if api.PreprovisionExtension != nil {
@@ -928,6 +930,9 @@ func convertMasterProfileToVLabs(api *MasterProfile, vlabsProfile *vlabs.MasterP
 		vlabsProfile.ImageRef = &vlabs.ImageReference{}
 		vlabsProfile.ImageRef.Name = api.ImageRef.Name
 		vlabsProfile.ImageRef.ResourceGroup = api.ImageRef.ResourceGroup
+		vlabsProfile.ImageRef.SubscriptionID = api.ImageRef.SubscriptionID
+		vlabsProfile.ImageRef.Gallery = api.ImageRef.Gallery
+		vlabsProfile.ImageRef.Version = api.ImageRef.Version
 	}
 	vlabsProfile.AvailabilityProfile = api.AvailabilityProfile
 	vlabsProfile.AgentSubnet = api.AgentSubnet
@@ -998,6 +1003,7 @@ func convertAgentPoolProfileToVLabs(api *AgentPoolProfile, p *vlabs.AgentPoolPro
 	p.Name = api.Name
 	p.Count = api.Count
 	p.VMSize = api.VMSize
+	p.CustomVMTags = api.CustomVMTags
 	p.OSDiskSizeGB = api.OSDiskSizeGB
 	p.DNSPrefix = api.DNSPrefix
 	p.OSType = vlabs.OSType(api.OSType)
@@ -1047,6 +1053,9 @@ func convertAgentPoolProfileToVLabs(api *AgentPoolProfile, p *vlabs.AgentPoolPro
 		p.ImageRef = &vlabs.ImageReference{}
 		p.ImageRef.Name = api.ImageRef.Name
 		p.ImageRef.ResourceGroup = api.ImageRef.ResourceGroup
+		p.ImageRef.SubscriptionID = api.ImageRef.SubscriptionID
+		p.ImageRef.Gallery = api.ImageRef.Gallery
+		p.ImageRef.Version = api.ImageRef.Version
 	}
 	p.Role = vlabs.AgentPoolProfileRole(api.Role)
 }
@@ -1180,6 +1189,7 @@ func convertAADProfileToVLabs(api *AADProfile, vlabs *vlabs.AADProfile) {
 func convertFeatureFlagsToVLabs(api *FeatureFlags, vlabs *vlabs.FeatureFlags) {
 	vlabs.EnableCSERunInBackground = api.EnableCSERunInBackground
 	vlabs.BlockOutboundInternet = api.BlockOutboundInternet
+	vlabs.EnableIPv6DualStack = api.EnableIPv6DualStack
 }
 
 func convertCloudProfileToVLabs(api *CustomCloudProfile, vlabsccp *vlabs.CustomCloudProfile) {

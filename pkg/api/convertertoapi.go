@@ -420,6 +420,7 @@ func convertVLabsProperties(vlabs *vlabs.Properties, api *Properties, isUpdate b
 func convertVLabsFeatureFlags(vlabs *vlabs.FeatureFlags, api *FeatureFlags) {
 	api.EnableCSERunInBackground = vlabs.EnableCSERunInBackground
 	api.BlockOutboundInternet = vlabs.BlockOutboundInternet
+	api.EnableIPv6DualStack = vlabs.EnableIPv6DualStack
 }
 
 func convertV20160930LinuxProfile(obj *v20160930.LinuxProfile, api *LinuxProfile) {
@@ -900,12 +901,14 @@ func convertVLabsMasterProfile(vlabs *vlabs.MasterProfile, api *MasterProfile) {
 	api.DNSPrefix = vlabs.DNSPrefix
 	api.SubjectAltNames = vlabs.SubjectAltNames
 	api.VMSize = vlabs.VMSize
+	api.CustomVMTags = vlabs.CustomVMTags
 	api.OSDiskSizeGB = vlabs.OSDiskSizeGB
 	api.VnetSubnetID = vlabs.VnetSubnetID
 	api.AgentVnetSubnetID = vlabs.AgentVnetSubnetID
 	api.FirstConsecutiveStaticIP = vlabs.FirstConsecutiveStaticIP
 	api.VnetCidr = vlabs.VnetCidr
 	api.Subnet = vlabs.GetSubnet()
+	api.SubnetIPv6 = vlabs.GetSubnetIPv6()
 	api.IPAddressCount = vlabs.IPAddressCount
 	api.FQDN = vlabs.FQDN
 	api.StorageProfile = vlabs.StorageProfile
@@ -938,6 +941,9 @@ func convertVLabsMasterProfile(vlabs *vlabs.MasterProfile, api *MasterProfile) {
 		api.ImageRef = &ImageReference{}
 		api.ImageRef.Name = vlabs.ImageRef.Name
 		api.ImageRef.ResourceGroup = vlabs.ImageRef.ResourceGroup
+		api.ImageRef.SubscriptionID = vlabs.ImageRef.SubscriptionID
+		api.ImageRef.Gallery = vlabs.ImageRef.Gallery
+		api.ImageRef.Version = vlabs.ImageRef.Version
 	}
 
 	api.AvailabilityProfile = vlabs.AvailabilityProfile
@@ -1013,6 +1019,7 @@ func convertVLabsAgentPoolProfile(vlabs *vlabs.AgentPoolProfile, api *AgentPoolP
 	api.Name = vlabs.Name
 	api.Count = vlabs.Count
 	api.VMSize = vlabs.VMSize
+	api.CustomVMTags = vlabs.CustomVMTags
 	api.OSDiskSizeGB = vlabs.OSDiskSizeGB
 	api.DNSPrefix = vlabs.DNSPrefix
 	api.OSType = OSType(vlabs.OSType)
@@ -1063,6 +1070,9 @@ func convertVLabsAgentPoolProfile(vlabs *vlabs.AgentPoolProfile, api *AgentPoolP
 		api.ImageRef = &ImageReference{}
 		api.ImageRef.Name = vlabs.ImageRef.Name
 		api.ImageRef.ResourceGroup = vlabs.ImageRef.ResourceGroup
+		api.ImageRef.SubscriptionID = vlabs.ImageRef.SubscriptionID
+		api.ImageRef.Gallery = vlabs.ImageRef.Gallery
+		api.ImageRef.Version = vlabs.ImageRef.Version
 	}
 	api.Role = AgentPoolProfileRole(vlabs.Role)
 }

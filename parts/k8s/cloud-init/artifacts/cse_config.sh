@@ -9,10 +9,6 @@ fi
 ETCD_PEER_URL="https://${PRIVATE_IP}:2380"
 ETCD_CLIENT_URL="https://${PRIVATE_IP}:2379"
 
-applyOSConfig(){
-    retrycmd_if_failure 120 5 25 update-grub || exit $ERR_CIS_APPLY_GRUB_CONFIG
-}
-
 systemctlEnableAndStart() {
     systemctl_restart 100 5 30 $1
     RESTART_STATUS=$?
@@ -21,20 +17,17 @@ systemctlEnableAndStart() {
         echo "$1 could not be started"
         return 1
     fi
-    retrycmd_if_failure 120 5 25 systemctl enable $1
-    if [ $? -ne 0 ]; then
+    if ! retrycmd_if_failure 120 5 25 systemctl enable $1; then
         echo "$1 could not be enabled by systemctl"
         return 1
     fi
 }
 systemctlDisableAndStop() {
-    systemctl_stop 100 5 30 $1
-    if [ $? -ne 0 ]; then
+    if ! systemctl_stop 100 5 30 $1; then
         echo "$1 could not be stopped"
         return 1
     fi
-    retrycmd_if_failure 120 5 25 systemctl disable $1
-    if [ $? -ne 0 ]; then
+    if ! retrycmd_if_failure 120 5 25 systemctl disable $1; then
         echo "$1 could not be disabled by systemctl"
         return 1
     fi
@@ -138,8 +131,7 @@ ensureAuditD() {
   if [[ "${AUDITD_ENABLED}" == true ]]; then
     systemctlEnableAndStart auditd || exit $ERR_SYSTEMCTL_START_FAIL
   else
-    apt list --installed | grep 'auditd'
-    if [ $? -eq 0 ]; then
+    if apt list --installed | grep 'auditd'; then
       systemctlDisableAndStop auditd || exit $ERR_SYSTEMCTL_START_FAIL
     fi
   fi
@@ -149,6 +141,14 @@ generateAggregatedAPICerts() {
     AGGREGATED_API_CERTS_SETUP_FILE=/etc/kubernetes/generate-proxy-certs.sh
     wait_for_file 1200 1 $AGGREGATED_API_CERTS_SETUP_FILE || exit $ERR_FILE_WATCH_TIMEOUT
     $AGGREGATED_API_CERTS_SETUP_FILE
+}
+
+configureKubeletServerCert() {
+    KUBELET_SERVER_PRIVATE_KEY_PATH="/etc/kubernetes/certs/kubeletserver.key"
+    KUBELET_SERVER_CERT_PATH="/etc/kubernetes/certs/kubeletserver.crt"
+
+    openssl genrsa -out $KUBELET_SERVER_PRIVATE_KEY_PATH 2048
+    openssl req -new -x509 -days 7300 -key $KUBELET_SERVER_PRIVATE_KEY_PATH -out $KUBELET_SERVER_CERT_PATH -subj "/CN=${NODE_NAME}"
 }
 
 configureK8s() {
@@ -170,9 +170,9 @@ configureK8s() {
     set +x
     echo "${KUBELET_PRIVATE_KEY}" | base64 --decode > "${KUBELET_PRIVATE_KEY_PATH}"
     echo "${APISERVER_PUBLIC_KEY}" | base64 --decode > "${APISERVER_PUBLIC_KEY_PATH}"
-    # Perform the required JSON escaping for special characters " and \
-    SERVICE_PRINCIPAL_CLIENT_SECRET=$(echo $SERVICE_PRINCIPAL_CLIENT_SECRET | sed "s|\\\\|\\\\\\\|g")
-    SERVICE_PRINCIPAL_CLIENT_SECRET=$(echo $SERVICE_PRINCIPAL_CLIENT_SECRET | sed 's|"|\\"|g')
+    # Perform the required JSON escaping for special characters \ and "
+    SERVICE_PRINCIPAL_CLIENT_SECRET=${SERVICE_PRINCIPAL_CLIENT_SECRET//\\/\\\\}
+    SERVICE_PRINCIPAL_CLIENT_SECRET=${SERVICE_PRINCIPAL_CLIENT_SECRET//\"/\\\"}
     cat << EOF > "${AZURE_JSON_PATH}"
 {
     "cloud":"${TARGET_ENVIRONMENT}",
@@ -215,6 +215,8 @@ EOF
             generateAggregatedAPICerts
         fi
     fi
+
+    configureKubeletServerCert
 }
 
 configureCNI() {
@@ -226,6 +228,12 @@ configureCNI() {
         systemctl enable sys-fs-bpf.mount
         systemctl restart sys-fs-bpf.mount
         REBOOTREQUIRED=true
+    fi
+
+    if [[ "${TARGET_ENVIRONMENT,,}" == "${AZURE_STACK_ENV}"  ]] && [[ "${NETWORK_PLUGIN}" = "azure" ]]; then
+        # set environment to mas when using Azure CNI on Azure Stack
+        # shellcheck disable=SC2002,SC2005
+        echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipam.environment = "mas"') > "$CNI_CONFIG_DIR/10-azure.conflist"
     fi
 }
 
@@ -308,6 +316,10 @@ ensureKMS() {
     systemctlEnableAndStart kms || exit $ERR_SYSTEMCTL_START_FAIL
 }
 
+ensureDHCPv6() {
+    systemctlEnableAndStart dhcpv6 || exit $ERR_SYSTEMCTL_START_FAIL
+}
+
 ensureKubelet() {
     KUBELET_DEFAULT_FILE=/etc/default/kubelet
     wait_for_file 1200 1 $KUBELET_DEFAULT_FILE || exit $ERR_FILE_WATCH_TIMEOUT
@@ -326,13 +338,6 @@ ensureJournal() {
         echo "ForwardToSyslog=yes"
     } >> /etc/systemd/journald.conf
     systemctlEnableAndStart systemd-journald || exit $ERR_SYSTEMCTL_START_FAIL
-}
-
-ensurePodSecurityPolicy() {
-    POD_SECURITY_POLICY_FILE="/etc/kubernetes/manifests/pod-security-policy.yaml"
-    if [ -f $POD_SECURITY_POLICY_FILE ]; then
-        $KUBECTL create -f $POD_SECURITY_POLICY_FILE
-    fi
 }
 
 ensureK8sControlPlane() {
@@ -396,7 +401,7 @@ configClusterAutoscalerAddon() {
 
         sed -i "s|<volMounts>|${CLUSTER_AUTOSCALER_MSI_VOLUME_MOUNT}|g" $CLUSTER_AUTOSCALER_ADDON_FILE
         sed -i "s|<vols>|${CLUSTER_AUTOSCALER_MSI_VOLUME}|g" $CLUSTER_AUTOSCALER_ADDON_FILE
-        sed -i "s|<hostNet>|$(echo "${CLUSTER_AUTOSCALER_MSI_HOST_NETWORK}")|g" $CLUSTER_AUTOSCALER_ADDON_FILE
+        sed -i "s|<hostNet>|${CLUSTER_AUTOSCALER_MSI_HOST_NETWORK}|g" $CLUSTER_AUTOSCALER_ADDON_FILE
     elif [[ "${USE_MANAGED_IDENTITY_EXTENSION}" == false ]]; then
         sed -i "s|<volMounts>|""|g" $CLUSTER_AUTOSCALER_ADDON_FILE
         sed -i "s|<vols>|""|g" $CLUSTER_AUTOSCALER_ADDON_FILE
@@ -409,7 +414,7 @@ configClusterAutoscalerAddon() {
     sed -i "s|<tenantID>|$(echo $TENANT_ID | base64)|g" $CLUSTER_AUTOSCALER_ADDON_FILE
     sed -i "s|<rg>|$(echo $RESOURCE_GROUP | base64)|g" $CLUSTER_AUTOSCALER_ADDON_FILE
     sed -i "s|<vmType>|$(echo $VM_TYPE | base64)|g" $CLUSTER_AUTOSCALER_ADDON_FILE
-    sed -i "s|<vmssName>|$(echo $PRIMARY_SCALE_SET)|g" $CLUSTER_AUTOSCALER_ADDON_FILE
+    sed -i "s|<vmssName>|$PRIMARY_SCALE_SET|g" $CLUSTER_AUTOSCALER_ADDON_FILE
 }
 
 configACIConnectorAddon() {
@@ -422,9 +427,9 @@ configACIConnectorAddon() {
     ACI_CONNECTOR_ADDON_FILE=/etc/kubernetes/addons/aci-connector-deployment.yaml
     wait_for_file 1200 1 $ACI_CONNECTOR_ADDON_FILE || exit $ERR_FILE_WATCH_TIMEOUT
     sed -i "s|<creds>|$ACI_CONNECTOR_CREDENTIALS|g" $ACI_CONNECTOR_ADDON_FILE
-    sed -i "s|<rgName>|$(echo $RESOURCE_GROUP)|g" $ACI_CONNECTOR_ADDON_FILE
-    sed -i "s|<cert>|$(echo $ACI_CONNECTOR_CERT)|g" $ACI_CONNECTOR_ADDON_FILE
-    sed -i "s|<key>|$(echo $ACI_CONNECTOR_KEY)|g" $ACI_CONNECTOR_ADDON_FILE
+    sed -i "s|<rgName>|$RESOURCE_GROUP|g" $ACI_CONNECTOR_ADDON_FILE
+    sed -i "s|<cert>|$ACI_CONNECTOR_CERT|g" $ACI_CONNECTOR_ADDON_FILE
+    sed -i "s|<key>|$ACI_CONNECTOR_KEY|g" $ACI_CONNECTOR_ADDON_FILE
 }
 
 configAddons() {
@@ -443,11 +448,13 @@ configGPUDrivers() {
     rmmod nouveau
     echo blacklist nouveau >> /etc/modprobe.d/blacklist.conf
     retrycmd_if_failure_no_stats 120 5 25 update-initramfs -u || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
+    wait_for_apt_locks
     retrycmd_if_failure 30 5 3600 apt-get -o Dpkg::Options::="--force-confold" install -y nvidia-container-runtime="${NVIDIA_CONTAINER_RUNTIME_VERSION}+docker18.09.2-1" || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
     tmpDir=$GPU_DEST/tmp
     (
       set -e -o pipefail
       cd "${tmpDir}"
+      wait_for_apt_locks
       dpkg-deb -R ./nvidia-docker2*.deb "${tmpDir}/pkg" || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
       cp -r ${tmpDir}/pkg/usr/* /usr/ || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
     )

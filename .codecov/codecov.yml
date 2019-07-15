@@ -33,6 +33,8 @@ ignore:
   - "test/**/*.go"
   - "pkg/api/mocks.go"
   - "pkg/armhelpers/azurestack/httpMockClient.go"
+  - "pkg/armhelpers/azurestack/testserver/testServer.go"
   - "pkg/armhelpers/mockclients.go"
   - "pkg/engine/testutils.go"
   - "pkg/test/*.go"
+  - pkg/engine/engine_dcos.go

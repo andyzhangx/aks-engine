@@ -11,44 +11,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-func TestKubernetesAddon(t *testing.T) {
-	addon := KubernetesAddon{
-		Name: "addon",
-		Containers: []KubernetesContainerSpec{
-			{
-				Name:           "addon",
-				CPURequests:    "50m",
-				MemoryRequests: "150Mi",
-				CPULimits:      "50m",
-				MemoryLimits:   "150Mi",
-			},
-		},
-	}
-	if !addon.IsEnabled(true) {
-		t.Fatalf("KubernetesAddon.IsEnabled(true) should always return true when Enabled property is not specified")
-	}
-
-	if addon.IsEnabled(false) {
-		t.Fatalf("KubernetesAddon.IsEnabled(false) should always return false when Enabled property is not specified")
-	}
-	e := true
-	addon.Enabled = &e
-	if !addon.IsEnabled(false) {
-		t.Fatalf("KubernetesAddon.IsEnabled(false) should always return true when Enabled property is set to true")
-	}
-	if !addon.IsEnabled(true) {
-		t.Fatalf("KubernetesAddon.IsEnabled(true) should always return true when Enabled property is set to true")
-	}
-	e = false
-	addon.Enabled = &e
-	if addon.IsEnabled(false) {
-		t.Fatalf("KubernetesAddon.IsEnabled(false) should always return false when Enabled property is set to false")
-	}
-	if addon.IsEnabled(true) {
-		t.Fatalf("KubernetesAddon.IsEnabled(true) should always return false when Enabled property is set to false")
-	}
-}
-
 func TestOrchestratorProfile(t *testing.T) {
 	OrchestratorProfileText := `{ "orchestratorType": "Mesos" }`
 	op := &OrchestratorProfile{}
@@ -323,37 +285,37 @@ func TestIsAzureStackCloud(t *testing.T) {
 	}{
 		{
 			"Empty environment name",
-			getMockPropertiesWithCustomCloudProfile("", true, true, false),
+			GetMockPropertiesWithCustomCloudProfile("", true, true, false),
 			true,
 		},
 		{
 			"Empty environment name with AzureEnvironmentSpecConfig",
-			getMockPropertiesWithCustomCloudProfile("", true, true, true),
+			GetMockPropertiesWithCustomCloudProfile("", true, true, true),
 			true,
 		},
 		{
 			"lower case cloud name",
-			getMockPropertiesWithCustomCloudProfile("azurestackcloud", true, true, true),
+			GetMockPropertiesWithCustomCloudProfile("azurestackcloud", true, true, true),
 			true,
 		},
 		{
 			"cammel case cloud name",
-			getMockPropertiesWithCustomCloudProfile("AzureStackCloud", true, true, true),
+			GetMockPropertiesWithCustomCloudProfile("AzureStackCloud", true, true, true),
 			true,
 		},
 		{
 			"incorrect cloud name",
-			getMockPropertiesWithCustomCloudProfile("NotAzureStackCloud", true, true, true),
+			GetMockPropertiesWithCustomCloudProfile("NotAzureStackCloud", true, true, true),
 			true,
 		},
 		{
 			"empty cloud profile",
-			getMockPropertiesWithCustomCloudProfile("AzureStackCloud", false, false, false),
+			GetMockPropertiesWithCustomCloudProfile("AzureStackCloud", false, false, false),
 			false,
 		},
 		{
 			"empty environment ",
-			getMockPropertiesWithCustomCloudProfile("AzureStackCloud", true, false, true),
+			GetMockPropertiesWithCustomCloudProfile("AzureStackCloud", true, false, true),
 			true,
 		},
 	}
@@ -377,12 +339,12 @@ func TestUbuntuVersion(t *testing.T) {
 			p: Properties{
 				MasterProfile: &MasterProfile{
 					Count:  1,
-					Distro: AKS,
+					Distro: AKSUbuntu1604,
 				},
 				AgentPoolProfiles: []*AgentPoolProfile{
 					{
 						Count:  1,
-						Distro: AKS,
+						Distro: AKSUbuntu1604,
 						OSType: Linux,
 					},
 				},
@@ -396,7 +358,7 @@ func TestUbuntuVersion(t *testing.T) {
 			p: Properties{
 				MasterProfile: &MasterProfile{
 					Count:  1,
-					Distro: AKS1804,
+					Distro: AKSUbuntu1804,
 				},
 				AgentPoolProfiles: []*AgentPoolProfile{
 					{
@@ -456,7 +418,7 @@ func TestMasterIsUbuntu(t *testing.T) {
 			p: Properties{
 				MasterProfile: &MasterProfile{
 					Count:  1,
-					Distro: AKS,
+					Distro: AKSUbuntu1604,
 				},
 			},
 			expected: true,
@@ -492,7 +454,7 @@ func TestMasterIsUbuntu(t *testing.T) {
 			p: Properties{
 				MasterProfile: &MasterProfile{
 					Count:  1,
-					Distro: AKS1804,
+					Distro: AKSUbuntu1804,
 				},
 			},
 			expected: true,
@@ -552,7 +514,7 @@ func TestAgentPoolIsUbuntu(t *testing.T) {
 				AgentPoolProfiles: []*AgentPoolProfile{
 					{
 						Count:  1,
-						Distro: AKS,
+						Distro: AKSUbuntu1604,
 					},
 				},
 			},
@@ -596,7 +558,7 @@ func TestAgentPoolIsUbuntu(t *testing.T) {
 				AgentPoolProfiles: []*AgentPoolProfile{
 					{
 						Count:  1,
-						Distro: AKS1804,
+						Distro: AKSUbuntu1804,
 					},
 				},
 			},
@@ -655,7 +617,7 @@ func TestAgentPoolIsUbuntu(t *testing.T) {
 	}
 }
 
-func getMockPropertiesWithCustomCloudProfile(name string, hasCustomCloudProfile, hasEnvironment, hasAzureEnvironmentSpecConfig bool) Properties {
+func GetMockPropertiesWithCustomCloudProfile(name string, hasCustomCloudProfile, hasEnvironment, hasAzureEnvironmentSpecConfig bool) Properties {
 	const (
 		managementPortalURL          = "https://management.local.azurestack.external/"
 		publishSettingsURL           = "https://management.local.azurestack.external/publishsettings/index"

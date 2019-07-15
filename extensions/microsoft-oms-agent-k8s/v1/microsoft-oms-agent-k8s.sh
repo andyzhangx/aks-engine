@@ -11,7 +11,7 @@ log() {
 
 get_param() {
   local param=$1
-  echo $(echo "$parameters" | jq ".$param" -r)
+  jq ".$param" -r <<<"$parameters"
 }
 
 install_script_dependencies() {
@@ -48,8 +48,10 @@ create_secret_yaml() {
   log 'Creating oms-agentsecret.yaml file'
   log ''
 
-  local wsid=$(get_param 'WSID')
-  local key=$(get_param 'KEY')
+  local wsid
+  wsid=$(get_param 'WSID')
+  local key
+  key=$(get_param 'KEY')
 
   cat > ./oms-agentsecret.yaml <<EOFSECRET
 apiVersion: v1
@@ -150,16 +152,14 @@ kubernetesStarted=1
 for i in {1..600}; do
     if [ -e /usr/local/bin/kubectl ]
     then
-        /usr/local/bin/kubectl cluster-info
-        if [ "$?" = "0" ]
+        if /usr/local/bin/kubectl cluster-info
         then
             log "kubernetes started"
             kubernetesStarted=0
             break
         fi
     else
-        /usr/bin/docker ps | grep apiserver
-        if [ "$?" = "0" ]
+        if /usr/bin/docker ps | grep apiserver
         then
             log "kubernetes started"
             kubernetesStarted=0

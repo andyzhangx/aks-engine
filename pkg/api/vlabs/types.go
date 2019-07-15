@@ -56,6 +56,7 @@ type Properties struct {
 type FeatureFlags struct {
 	EnableCSERunInBackground bool `json:"enableCSERunInBackground,omitempty"`
 	BlockOutboundInternet    bool `json:"blockOutboundInternet,omitempty"`
+	EnableIPv6DualStack      bool `json:"enableIPv6DualStack,omitempty"`
 }
 
 // ServicePrincipalProfile contains the client and secret used by the cluster for Azure Resource CRUD
@@ -243,14 +244,6 @@ type KubernetesAddon struct {
 	Data       string                    `json:"data,omitempty"`
 }
 
-// IsEnabled returns if the addon is explicitly enabled, or the user-provided default if non explicitly enabled
-func (a *KubernetesAddon) IsEnabled(ifNil bool) bool {
-	if a.Enabled == nil {
-		return ifNil
-	}
-	return *a.Enabled
-}
-
 // PrivateCluster defines the configuration for a private cluster
 type PrivateCluster struct {
 	Enabled        *bool                  `json:"enabled,omitempty"`
@@ -318,7 +311,7 @@ type KubernetesConfig struct {
 	CloudControllerManagerConfig    map[string]string `json:"cloudControllerManagerConfig,omitempty"`
 	APIServerConfig                 map[string]string `json:"apiServerConfig,omitempty"`
 	SchedulerConfig                 map[string]string `json:"schedulerConfig,omitempty"`
-	PodSecurityPolicyConfig         map[string]string `json:"podSecurityPolicyConfig,omitempty"`
+	PodSecurityPolicyConfig         map[string]string `json:"podSecurityPolicyConfig,omitempty"` // Deprecated
 	CloudProviderBackoff            *bool             `json:"cloudProviderBackoff,omitempty"`
 	CloudProviderBackoffRetries     int               `json:"cloudProviderBackoffRetries,omitempty"`
 	CloudProviderBackoffJitter      float64           `json:"cloudProviderBackoffJitter,omitempty"`
@@ -393,9 +386,12 @@ type MasterProfile struct {
 	AvailabilityZones        []string          `json:"availabilityZones,omitempty"`
 	SinglePlacementGroup     *bool             `json:"singlePlacementGroup,omitempty"`
 	AuditDEnabled            *bool             `json:"auditDEnabled,omitempty"`
+	CustomVMTags             map[string]string `json:"customVMTags,omitempty"`
 
 	// subnet is internal
 	subnet string
+	// subnetIPv6 is internal
+	subnetIPv6 string
 
 	// Master LB public endpoint/FQDN with port
 	// The format will be FQDN:2376
@@ -408,8 +404,11 @@ type MasterProfile struct {
 
 // ImageReference represents a reference to an Image resource in Azure.
 type ImageReference struct {
-	Name          string `json:"name,omitempty"`
-	ResourceGroup string `json:"resourceGroup,omitempty"`
+	Name           string `json:"name,omitempty"`
+	ResourceGroup  string `json:"resourceGroup,omitempty"`
+	SubscriptionID string `json:"subscriptionId,omitempty"`
+	Gallery        string `json:"gallery,omitempty"`
+	Version        string `json:"version,omitempty"`
 }
 
 // ExtensionProfile represents an extension definition
@@ -455,6 +454,7 @@ type AgentPoolProfile struct {
 	AcceleratedNetworkingEnabledWindows *bool                `json:"acceleratedNetworkingEnabledWindows,omitempty"`
 	VMSSOverProvisioningEnabled         *bool                `json:"vmssOverProvisioningEnabled,omitempty"`
 	AuditDEnabled                       *bool                `json:"auditDEnabled,omitempty"`
+	CustomVMTags                        map[string]string    `json:"customVMTags,omitempty"`
 
 	// subnet is internal
 	subnet string
@@ -579,9 +579,19 @@ func (m *MasterProfile) GetSubnet() string {
 	return m.subnet
 }
 
+// GetSubnetIPv6 returns the read-only ipv6 subnet for the master
+func (m *MasterProfile) GetSubnetIPv6() string {
+	return m.subnetIPv6
+}
+
 // SetSubnet sets the read-only subnet for the master
 func (m *MasterProfile) SetSubnet(subnet string) {
 	m.subnet = subnet
+}
+
+// SetSubnetIPv6 sets the read-only ipv6 subnet for the master
+func (m *MasterProfile) SetSubnetIPv6(subnetIPv6 string) {
+	m.subnetIPv6 = subnetIPv6
 }
 
 // IsManagedDisks returns true if the master specified managed disks
@@ -607,7 +617,7 @@ func (m *MasterProfile) IsCoreOS() bool {
 // IsUbuntu1604 returns true if the master profile distro is based on Ubuntu 16.04
 func (m *MasterProfile) IsUbuntu1604() bool {
 	switch m.Distro {
-	case AKS, Ubuntu, ACC1604:
+	case AKSUbuntu1604, Ubuntu, ACC1604:
 		return true
 	default:
 		return false
@@ -617,7 +627,7 @@ func (m *MasterProfile) IsUbuntu1604() bool {
 // IsUbuntu1804 returns true if the master profile distro is based on Ubuntu 18.04
 func (m *MasterProfile) IsUbuntu1804() bool {
 	switch m.Distro {
-	case AKS1804, Ubuntu1804:
+	case AKSUbuntu1804, Ubuntu1804:
 		return true
 	default:
 		return false
@@ -742,7 +752,7 @@ func (a *AgentPoolProfile) HasAvailabilityZones() bool {
 func (a *AgentPoolProfile) IsUbuntu1604() bool {
 	if a.OSType != Windows {
 		switch a.Distro {
-		case AKS, Ubuntu, ACC1604:
+		case AKSUbuntu1604, Ubuntu, ACC1604:
 			return true
 		default:
 			return false
@@ -755,7 +765,7 @@ func (a *AgentPoolProfile) IsUbuntu1604() bool {
 func (a *AgentPoolProfile) IsUbuntu1804() bool {
 	if a.OSType != Windows {
 		switch a.Distro {
-		case AKS1804, Ubuntu1804:
+		case AKSUbuntu1804, Ubuntu1804:
 			return true
 		default:
 			return false
@@ -806,4 +816,9 @@ func (k *KubernetesConfig) IsRBACEnabled() bool {
 		return to.Bool(k.EnableRbac)
 	}
 	return false
+}
+
+// IsIPv6DualStackEnabled checks if IPv6DualStack feature is enabled
+func (f *FeatureFlags) IsIPv6DualStackEnabled() bool {
+	return f != nil && f.EnableIPv6DualStack
 }

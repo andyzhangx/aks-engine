@@ -64,12 +64,6 @@ else
 fi
 
 if [[ $OS == $UBUNTU_OS_NAME ]] && [ "$FULL_INSTALL_REQUIRED" = "true" ]; then
-    cis_sysctl=/etc/sysctl.d/60-CIS.conf
-    wait_for_file 3600 1 $cis_sysctl || exit $ERR_FILE_WATCH_TIMEOUT
-    cis_rsyslog=/etc/rsyslog.d/60-CIS.conf
-    wait_for_file 3600 1 $cis_rsyslog || exit $ERR_FILE_WATCH_TIMEOUT
-    sysctl_reload 20 5 10 || exit $ERR_SYSCTL_RELOAD
-    applyOSConfig
     installDeps
 else
     echo "Golden image; skipping dependencies installation"
@@ -160,6 +154,15 @@ if [[ -n "${MASTER_NODE}" && "${KMS_PROVIDER_VAULT_NAME}" != "" ]]; then
     ensureKMS
 fi
 
+# configure and enable dhcpv6 for dual stack feature
+if [ "$IS_IPV6_DUALSTACK_FEATURE_ENABLED" = "true" ]; then
+    dhcpv6_systemd_service=/etc/systemd/system/dhcpv6.service
+    dhcpv6_configuration_script=/opt/azure/containers/enable-dhcpv6.sh
+    wait_for_file 3600 1 $dhcpv6_systemd_service || exit $ERR_FILE_WATCH_TIMEOUT
+    wait_for_file 3600 1 $dhcpv6_configuration_script || exit $ERR_FILE_WATCH_TIMEOUT
+    ensureDHCPv6
+fi
+
 ensureKubelet
 ensureJournal
 
@@ -169,7 +172,6 @@ if [[ -n "${MASTER_NODE}" ]]; then
       ensureEtcd
     fi
     ensureK8sControlPlane
-    ensurePodSecurityPolicy
 fi
 
 if $FULL_INSTALL_REQUIRED; then
@@ -186,11 +188,7 @@ echo $(date),$(hostname), endcustomscript>>/opt/m
 mkdir -p /opt/azure/containers && touch /opt/azure/containers/provision.complete
 ps auxfww > /opt/azure/provision-ps.log &
 
-if $FULL_INSTALL_REQUIRED; then
-  if [[ $OS == $UBUNTU_OS_NAME ]]; then
-    applyCIS
-  fi
-else
+if ! $FULL_INSTALL_REQUIRED; then
   cleanUpContainerImages
 fi
 

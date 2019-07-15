@@ -38,11 +38,11 @@ installEtcd() {
 installDeps() {
     retrycmd_if_failure_no_stats 120 5 25 curl -fsSL https://packages.microsoft.com/config/ubuntu/${UBUNTU_RELEASE}/packages-microsoft-prod.deb > /tmp/packages-microsoft-prod.deb || exit $ERR_MS_PROD_DEB_DOWNLOAD_TIMEOUT
     retrycmd_if_failure 60 5 10 dpkg -i /tmp/packages-microsoft-prod.deb || exit $ERR_MS_PROD_DEB_PKG_ADD_FAIL
+    aptmarkWALinuxAgent hold
     apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
     apt_get_dist_upgrade || exit $ERR_APT_DIST_UPGRADE_TIMEOUT
-    for apt_package in apt-transport-https auditd blobfuse ca-certificates ceph-common cgroup-lite cifs-utils conntrack cracklib-runtime ebtables ethtool fuse git glusterfs-client init-system-helpers iproute2 ipset iptables jq libpam-pwquality libpwquality-tools mount nfs-common pigz socat util-linux xz-utils zip htop iotop iftop sysstat; do
-      apt_get_install 30 1 600 $apt_package
-      if [ $? -ne 0 ]; then
+    for apt_package in apt-transport-https auditd blobfuse ca-certificates ceph-common cgroup-lite cifs-utils conntrack cracklib-runtime ebtables ethtool fuse git glusterfs-client htop iftop init-system-helpers iotop iproute2 ipset iptables jq libpam-pwquality libpwquality-tools mount nfs-common pigz socat sysstat util-linux xz-utils zip; do
+      if ! apt_get_install 30 1 600 $apt_package; then
         journalctl --no-pager -u $apt_package
         exit $ERR_APT_INSTALL_TIMEOUT
       fi
@@ -62,19 +62,19 @@ installGPUDrivers() {
     retrycmd_if_failure 30 5 3600 apt-get install -y linux-headers-$(uname -r) gcc make dkms || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
     retrycmd_if_failure 30 5 60 curl -fLS https://us.download.nvidia.com/tesla/$GPU_DV/NVIDIA-Linux-x86_64-${GPU_DV}.run -o ${GPU_DEST}/nvidia-drivers-${GPU_DV} || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
     tmpDir=$GPU_DEST/tmp
-    (
+    if ! (
       set -e -o pipefail
       cd "${tmpDir}"
       retrycmd_if_failure 30 5 3600 apt-get download nvidia-docker2="${NVIDIA_DOCKER_VERSION}+docker18.09.2-1" || exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
-    )
-    if [ ! $? -eq 0 ]; then
+    ); then
       exit $ERR_GPU_DRIVERS_INSTALL_TIMEOUT
     fi
 }
 
 installSGXDrivers() {
     echo "Installing SGX driver"
-    local VERSION=$(grep DISTRIB_RELEASE /etc/*-release| cut -f 2 -d "=")
+    local VERSION
+    VERSION=$(grep DISTRIB_RELEASE /etc/*-release| cut -f 2 -d "=")
     case $VERSION in
     "18.04")
         SGX_DRIVER_URL="https://download.01.org/intel-sgx/dcap-1.0.1/dcap_installer/ubuntuServer1804/sgx_linux_x64_driver_dcap_4f32b98.bin"
@@ -92,7 +92,8 @@ installSGXDrivers() {
     wait_for_apt_locks
     retrycmd_if_failure 30 5 3600 apt-get -y install $PACKAGES  || exit $ERR_SGX_DRIVERS_INSTALL_TIMEOUT
 
-    local SGX_DRIVER=$(basename $SGX_DRIVER_URL)
+    local SGX_DRIVER
+    SGX_DRIVER=$(basename $SGX_DRIVER_URL)
     local OE_DIR=/opt/azure/containers/oe
     mkdir -p ${OE_DIR}
 
@@ -126,28 +127,33 @@ installMoby() {
         retrycmd_if_failure_no_stats 120 5 25 curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/microsoft.gpg || exit $ERR_MS_GPG_KEY_DOWNLOAD_TIMEOUT
         retrycmd_if_failure 10 5 10 cp /tmp/microsoft.gpg /etc/apt/trusted.gpg.d/ || exit $ERR_MS_GPG_KEY_DOWNLOAD_TIMEOUT
         apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
-        apt_get_install 20 30 120 moby-engine=${MOBY_VERSION} moby-cli=3.0.3 --allow-downgrades || exit $ERR_MOBY_INSTALL_TIMEOUT  # HACK: revert moby-cli to ${MOBY_VERSION} for next release
+        MOBY_CLI=${MOBY_VERSION}
+        if [[ "${MOBY_CLI}" == "3.0.4" ]]; then
+            MOBY_CLI="3.0.3"
+        fi
+        apt_get_install 20 30 120 moby-engine=${MOBY_VERSION} moby-cli=${MOBY_CLI} --allow-downgrades || exit $ERR_MOBY_INSTALL_TIMEOUT
     fi
 }
 
 installKataContainersRuntime() {
     # TODO incorporate this into packer CI so that it is pre-baked into the VHD image
     echo "Adding Kata Containers repository key..."
+    ARCH=$(arch)
+    BRANCH=stable-1.7
     KATA_RELEASE_KEY_TMP=/tmp/kata-containers-release.key
-    KATA_URL=http://download.opensuse.org/repositories/home:/katacontainers:/release/xUbuntu_${UBUNTU_RELEASE}/Release.key
+    KATA_URL=http://download.opensuse.org/repositories/home:/katacontainers:/releases:/${ARCH}:/${BRANCH}/xUbuntu_${UBUNTU_RELEASE}/Release.key
     retrycmd_if_failure_no_stats 120 5 25 curl -fsSL $KATA_URL > $KATA_RELEASE_KEY_TMP || exit $ERR_KATA_KEY_DOWNLOAD_TIMEOUT
     wait_for_apt_locks
     retrycmd_if_failure 30 5 30 apt-key add $KATA_RELEASE_KEY_TMP || exit $ERR_KATA_APT_KEY_TIMEOUT
     echo "Adding Kata Containers repository..."
-    echo "deb http://download.opensuse.org/repositories/home:/katacontainers:/release/xUbuntu_${UBUNTU_RELEASE}/ /" > /etc/apt/sources.list.d/kata-containers.list
+    echo "deb http://download.opensuse.org/repositories/home:/katacontainers:/releases:/${ARCH}:/${BRANCH}/xUbuntu_${UBUNTU_RELEASE}/ /" > /etc/apt/sources.list.d/kata-containers.list
     echo "Installing Kata Containers runtime..."
     apt_get_update || exit $ERR_APT_UPDATE_TIMEOUT
     apt_get_install 120 5 25 kata-runtime || exit $ERR_KATA_INSTALL_TIMEOUT
 }
 
 installClearContainersRuntime() {
-    cc-runtime --version
-    if [ $? -eq 0 ]; then
+    if cc-runtime --version; then
         echo "cc-runtime is already installed, skipping download"
     else
         echo "Adding Clear Containers repository key..."
@@ -300,6 +306,7 @@ cleanUpContainerImages() {
 
 cleanUpGPUDrivers() {
     rm -Rf $GPU_DEST
+    rm -f /etc/apt/sources.list.d/nvidia-docker.list
 }
 
 cleanUpContainerd() {
@@ -307,7 +314,11 @@ cleanUpContainerd() {
 }
 
 cleanUpClearContainers() {
+    wait_for_apt_locks
     apt-get purge -y cc-runtime
+    wait_for_apt_locks
+    apt-get autoremove -y
+    rm -f /etc/apt/sources.list.d/cc-runtime.list
 }
 
 overrideNetworkConfig() {

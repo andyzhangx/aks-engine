@@ -13,7 +13,7 @@ import (
 	"github.com/Azure/aks-engine/pkg/helpers"
 )
 
-func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVersion string) (paramsMap, error) {
+func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVersion string) paramsMap {
 	properties := cs.Properties
 	location := cs.Location
 	parametersMap := paramsMap{}
@@ -65,12 +65,15 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 			if properties.MasterProfile.IsVirtualMachineScaleSets() {
 				addValue(parametersMap, "agentVnetSubnetID", properties.MasterProfile.AgentVnetSubnetID)
 			}
-			if properties.OrchestratorProfile.IsKubernetes() {
+			if properties.OrchestratorProfile.IsKubernetes() && properties.MasterProfile.VnetCidr != "" {
 				addValue(parametersMap, "vnetCidr", properties.MasterProfile.VnetCidr)
 			}
 		} else {
 			addValue(parametersMap, "masterSubnet", properties.MasterProfile.Subnet)
 			addValue(parametersMap, "agentSubnet", properties.MasterProfile.AgentSubnet)
+			if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
+				addValue(parametersMap, "masterSubnetIPv6", properties.MasterProfile.SubnetIPv6)
+			}
 		}
 		addValue(parametersMap, "firstConsecutiveStaticIP", properties.MasterProfile.FirstConsecutiveStaticIP)
 		addValue(parametersMap, "masterVMSize", properties.MasterProfile.VMSize)
@@ -252,5 +255,5 @@ func getParameters(cs *api.ContainerService, generatorCode string, aksEngineVers
 		}
 	}
 
-	return parametersMap, nil
+	return parametersMap
 }

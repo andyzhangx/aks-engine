@@ -199,9 +199,19 @@ environment variables to be set:
 * `SUBSCRIPTION_ID`: Azure subscription UUID
 * `TENANT_ID`: Azure tenant UUID
 
+You can set these optional environment variable to configure how the end-to-end tests run
+* `CLUSTER_DEFINITION`: Input apimodel. Defaults to `examples/kubernetes.json`
+* `LOCATION`: Azure region where the resources for the test cluster will be created.
+* `NAME`: Name of an existing cluster to use for testing
+
 The end-to-end tests also require the `k` script from the `scripts/` folder in to
 be in your search $PATH. This ensures that testing uses a `kubectl` client that
 matches the version of the Kubernetes server.
+
+Below is an example command to run end-to-end tests for Kubernetes. Make sure the `NAME` environment variable is not set if you want a new cluster to be deployed.
+```bash
+CLUSTER_DEFINITION=examples/kubernetes.json SUBSCRIPTION_ID="<YOUR_SUB_ID>" CLIENT_ID="<YOUR_CLIENT_ID" CLIENT_SECRET="<YOUR_CLIENT_SECRET>" TENANT_ID="<YOUR_TENANT_ID>" LOCATION=<REGION> CLEANUP_ON_EXIT=true make test-kubernetes
+```
 
 ### Debugging
 
@@ -272,6 +282,10 @@ Copy and paste the configuration and change the values in the `--set` arguments 
 details. You can create multiple configurations in `launch.json` to debug `aks-engine upgrade`,
 `scale`, and other commands.
 
+For a more detailed debugging configuration, check out the [example launch.json](example-launch.json)
+in this directory. It assumes you have `$CLIENT_ID`, `$CLIENT_SECRET`, and `$AKSE_PUB_KEY` environment
+variables set, and will prompt you for other command inputs when starting the debugger.
+
 The `.vscode/launch.json` file is ignored by `git`, so your local version won't be overwritten when
 you push or pull changes.
 
@@ -319,3 +333,18 @@ The following steps constitute the AKS Engine CI pipeline:
 1. The PR is code reviewed by the members of AKS Engine team
 1. Once the PR is approved and the end-to-end job has passed, the PR can now be merged into the master branch
 1. Once merged, another job is triggered to verify integrity of the master branch. This job is similar to the PR job.
+
+## Pull Requests and Generated Code
+
+To make it easier use AKS Engine as a library and to `go get github.com/Azure/aks-engine`, some
+generated Go code is committed to the repository. Your pull request may need to regenerate those
+files before it will pass the required `make ensure-generated` step.
+	
+Always run `make build` before you submit a pull request to validate compilation and
+generated code hygiene. Run `make ensure-generated` yourself to validate that things check out. If there are
+discrepencies, `make ensure-generated` will output a brief error report.
+
+### What is generated?
+
+- Changes under the `parts/` folder require the `pkg/engine/templates_generated.go` file to be updated.
+- Changes under `pkg/i8n/translations` require the `pkg/engine/translations_generated.go` file to be updated.

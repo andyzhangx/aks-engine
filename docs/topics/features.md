@@ -10,6 +10,7 @@
 |Kata Containers Runtime|Alpha|`vlabs`|[kubernetes-kata-containers.json](../../examples/kubernetes-kata-containers.json)|[Description](#feat-kata-containers)|
 |Private Cluster|Alpha|`vlabs`|[kubernetes-private-cluster.json](../../examples/kubernetes-config/kubernetes-private-cluster.json)|[Description](#feat-private-cluster)|
 |Azure Key Vault Encryption|Alpha|`vlabs`|[kubernetes-keyvault-encryption.json](../../examples/kubernetes-config/kubernetes-keyvault-encryption.json)|[Description](#feat-keyvault-encryption)|
+|Shared Image Gallery images|Alpha|`vlabs`|[custom-shared-image.json](../../examples/custom-shared-image.json)|[Description](#feat-shared-image-gallery)|
 
 <a name="feat-kubernetes-msi"></a>
 
@@ -82,7 +83,7 @@ In order to use these storage classes the following conditions must be met.
 ```console
 kubectl get nodes -l storageprofile=managed
 NAME                    STATUS    AGE       VERSION
-k8s-agent1-23731866-0   Ready     24m       v1.7.2
+k8s-agent1-23731866-0   Ready     24m       v1.12.8
 ```
 
 - The VM size must support the type of managed disk type requested. For example, Premium VM sizes with managed OS disks support both managed-standard and managed-premium storage classes whereas Standard VM sizes with managed OS disks only support managed-standard storage class.
@@ -170,9 +171,9 @@ Per default Calico still allows all communication within the cluster. Using Kube
 - [NetworkPolicy Example Walkthrough](https://kubernetes.io/docs/getting-started-guides/network-policy/walkthrough/)
 - [Calico Kubernetes](https://github.com/Azure/aks-engine/blob/master/examples/networkpolicy)
 
-### Calico 3.3 cleanup after upgrading to 3.5
+### Calico 3.3 cleanup after upgrading to 3.5 or greater
 
-Because Calico 3.3 is using Calico CNI, while Calico 3.5 moves to Azure CNI, if the cluster is upgraded from calico 3.3 to 3.5, then some manual cluster resource cleanup will be required to successfully complete the upgrade. We've provided a sample resource spec here that can be used as an example:
+Because Calico 3.3 is using Calico CNI, while Calico 3.5 or greater moves to Azure CNI, if the cluster is upgraded from calico 3.3 to 3.5 or greater, then some manual cluster resource cleanup will be required to successfully complete the upgrade. We've provided a sample resource spec here that can be used as an example:
 
 https://github.com/Azure/aks-engine/raw/master/docs/topics/calico-3.3.1-cleanup-after-upgrade.yaml
 
@@ -187,7 +188,7 @@ And then using your modified file, do something like this:
 kubectl delete -f calico-3.3.1-cleanup-after-upgrade-modified-with-my-cluster-configuration.yaml
 ```
 
-After this, addon-manager would enforce the correct spec for Calico 3.5.
+After this, addon-manager would enforce the correct spec for Calico 3.5 or greater.
 
 <a name="feat-cilium"></a>
 
@@ -453,4 +454,62 @@ To get `objectId` of the service principal:
 
 ```console
 az ad sp list --spn <YOUR SERVICE PRINCIPAL appId>
+```
+
+<a name="feat-shared-image-gallery"></a>
+
+## Use a Shared Image Gallery image
+
+This is possible by specifying `imageReference` under `masterProfile` or on a given `agentPoolProfile`. It also requires setting the distro to an appropriate value (`ubuntu` or `coreos`). When using `imageReference` with Shared Image Galleries, provide an image name and version, as well as the resource group, subscription, and name of the gallery. Example:
+
+```json
+{
+    "apiVersion": "vlabs",
+    "properties": {
+      "orchestratorProfile": {
+        "orchestratorType": "Kubernetes"
+      },
+      "masterProfile": {
+        "imageReference": {
+          "name": "linuxvm",
+          "resourceGroup": "sig",
+          "subscriptionID": "00000000-0000-0000-0000-000000000000",
+          "gallery": "siggallery",
+          "version": "0.0.1"
+        },
+        "count": 1,
+        "dnsPrefix": "",
+        "vmSize": "Standard_D2_v3"
+      },
+      "agentPoolProfiles": [
+        {
+          "name": "agentpool1",
+          "count": 3,
+          "imageReference": {
+            "name": "linuxvm",
+            "resourceGroup": "sig",
+            "subscriptionID": "00000000-0000-0000-0000-000000000000",
+            "gallery": "siggallery",
+            "version": "0.0.1"
+          },
+          "vmSize": "Standard_D2_v3",
+          "availabilityProfile": "AvailabilitySet"
+        }
+      ],
+      "linuxProfile": {
+        "adminUsername": "azureuser",
+        "ssh": {
+          "publicKeys": [
+            {
+              "keyData": ""
+            }
+          ]
+        }
+      },
+      "servicePrincipalProfile": {
+        "clientId": "",
+        "secret": ""
+      }
+    }
+  }
 ```

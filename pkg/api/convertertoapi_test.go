@@ -78,8 +78,8 @@ func makeAgentPoolProfile(count int, name, dNSPrefix, vMSize string, oSType OSTy
 func makeMasterProfile(count int, dNSPrefix, vMSize string) *MasterProfile {
 	return &MasterProfile{
 		Count:     count,
-		DNSPrefix: "test-dcos",
-		VMSize:    "Standard_D2_v2",
+		DNSPrefix: dNSPrefix,
+		VMSize:    vMSize,
 	}
 }
 
@@ -136,7 +136,7 @@ func TestOrchestratorVersion(t *testing.T) {
 		Properties: &vlabs.Properties{
 			OrchestratorProfile: &vlabs.OrchestratorProfile{
 				OrchestratorType:    vlabs.Kubernetes,
-				OrchestratorVersion: "1.9.11",
+				OrchestratorVersion: "1.10.13",
 			},
 		},
 	}
@@ -144,7 +144,7 @@ func TestOrchestratorVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to convert ContainerService, error: %s", err)
 	}
-	if cs.Properties.OrchestratorProfile.OrchestratorVersion != "1.9.11" {
+	if cs.Properties.OrchestratorProfile.OrchestratorVersion != "1.10.13" {
 		t.Fatalf("incorrect OrchestratorVersion '%s'", cs.Properties.OrchestratorProfile.OrchestratorVersion)
 	}
 }
@@ -845,6 +845,21 @@ func TestConvertVLabsContainerService(t *testing.T) {
 					DNSPrefix: "blueorange",
 					FQDN:      "blueorange.westus2.azureapp.com",
 					OSType:    "Linux",
+				},
+				{
+					Name:      "sampleAgent-public",
+					Count:     2,
+					VMSize:    "sampleVM",
+					DNSPrefix: "blueorange",
+					FQDN:      "blueorange.westus2.com",
+					OSType:    "Linux",
+					ImageRef: &vlabs.ImageReference{
+						Name:           "testImage",
+						ResourceGroup:  "testRg",
+						SubscriptionID: "testSub",
+						Gallery:        "testGallery",
+						Version:        "0.0.1",
+					},
 				},
 			},
 			MasterProfile: &vlabs.MasterProfile{

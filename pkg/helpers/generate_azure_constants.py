@@ -17,7 +17,7 @@ def get_all_sizes():
             # NOTE: "az vm list-sizes" fails in francesouth, australiacentral, australiacentral2, and southafricawest.
             sizes = json.loads(subprocess.check_output(['az', 'vm', 'list-sizes', '-l', location['name'], '-o', 'json']).decode('utf-8'))
             for size in sizes:
-                if not size['name'] in size_map and not size['name'].split('_')[0] == 'Basic':
+                if not size['name'] in size_map and not size['name'].split('_')[0] == 'Basic' and not size['name'][-6:] == '_Promo':
                     size_map[size['name']] = size
         except subprocess.CalledProcessError:
             continue
@@ -121,8 +121,8 @@ func GetDCOSMasterAllowedSizes() string {
 `
 }
 
-// GetKubernetesAllowedSizes returns the allowed sizes for Kubernetes agent
- func GetKubernetesAllowedSizes() string {
+// GetKubernetesAllowedVMSKUs returns the allowed sizes for Kubernetes agent
+ func GetKubernetesAllowedVMSKUs() string {
         return `      "allowedValues": [
 """
     kubernetes_agent_map_keys = sorted(kubernetes_size_map.keys())

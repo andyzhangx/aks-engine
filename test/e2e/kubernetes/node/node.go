@@ -65,7 +65,7 @@ type Address struct {
 type Info struct {
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
 	KubeProxyVersion        string `json:"kubeProxyVersion"`
-	KubeletProxyVersion     string `json:"kubeletVersion"`
+	KubeletVersion          string `json:"kubeletVersion"`
 	OperatingSystem         string `json:"operatingSystem"`
 	OSImage                 string `json:"osImage"`
 }
@@ -100,6 +100,11 @@ func (n *Node) IsLinux() bool {
 	return n.Status.NodeInfo.OperatingSystem == "linux"
 }
 
+// IsWindows checks for a Windows node
+func (n *Node) IsWindows() bool {
+	return n.Status.NodeInfo.OperatingSystem == "windows"
+}
+
 // IsUbuntu checks for an Ubuntu-backed node
 func (n *Node) IsUbuntu() bool {
 	if n.IsLinux() {
@@ -108,10 +113,10 @@ func (n *Node) IsUbuntu() bool {
 	return false
 }
 
-// IsInProfile determines if this node is running on a vm with auditd enabled
-func (n *Node) IsInProfile(profiles []string) bool {
-	for _, profile := range profiles {
-		if strings.Contains(strings.ToLower(n.Metadata.Name), profile) {
+// HasSubstring determines if a node name matches includes the passed in substring
+func (n *Node) HasSubstring(substrings []string) bool {
+	for _, substring := range substrings {
+		if strings.Contains(strings.ToLower(n.Metadata.Name), substring) {
 			return true
 		}
 	}
