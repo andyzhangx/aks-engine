@@ -406,6 +406,7 @@ type KubernetesConfig struct {
 	MaximumLoadBalancerRuleCount     int               `json:"maximumLoadBalancerRuleCount,omitempty"`
 	ProxyMode                        KubeProxyMode     `json:"kubeProxyMode,omitempty"`
 	PrivateAzureRegistryServer       string            `json:"privateAzureRegistryServer,omitempty"`
+	OutboundRuleIdleTimeoutInMinutes int32             `json:"outboundRuleIdleTimeoutInMinutes,omitempty"`
 }
 
 // CustomFile has source as the full absolute source path to a file and dest
@@ -810,6 +811,16 @@ func (p *Properties) HasStorageAccountDisks() bool {
 	return false
 }
 
+// HasStorageAccountDisks returns true if the cluster contains agent pools with Ephemeral Disks
+func (p *Properties) HasEphemeralDisks() bool {
+	for _, agentPoolProfile := range p.AgentPoolProfiles {
+		if agentPoolProfile.StorageProfile == Ephemeral {
+			return true
+		}
+	}
+	return false
+}
+
 // TotalNodes returns the total number of nodes in the cluster configuration
 func (p *Properties) TotalNodes() int {
 	var totalNodes int
@@ -1199,6 +1210,16 @@ func (p *Properties) GetMasterFQDN() string {
 	return p.MasterProfile.FQDN
 }
 
+// AnyAgentHasLoadBalancerBackendAddressPoolIDs returns true if any of the agent profiles contains LoadBalancerBackendAddressPoolIDs
+func (p *Properties) AnyAgentHasLoadBalancerBackendAddressPoolIDs() bool {
+	for _, agentPoolProfile := range p.AgentPoolProfiles {
+		if agentPoolProfile.LoadBalancerBackendAddressPoolIDs != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // HasImageRef returns true if the customer brought os image
 func (m *MasterProfile) HasImageRef() bool {
 	return m.ImageRef != nil && len(m.ImageRef.Name) > 0 && len(m.ImageRef.ResourceGroup) > 0
@@ -1393,6 +1414,11 @@ func (a *AgentPoolProfile) IsStorageAccount() bool {
 	return a.StorageProfile == StorageAccount
 }
 
+// IsStorageAccount returns true if the customer specified ephemeral disks
+func (a *AgentPoolProfile) IsEphemeral() bool {
+	return a.StorageProfile == Ephemeral
+}
+
 // HasDisks returns true if the customer specified disks
 func (a *AgentPoolProfile) HasDisks() bool {
 	return len(a.DiskSizesGB) > 0
@@ -1440,10 +1466,14 @@ func (a *AgentPoolProfile) IsUbuntuNonVHD() bool {
 }
 
 // GetKubernetesLabels returns a k8s API-compliant labels string for nodes in this profile
-func (a *AgentPoolProfile) GetKubernetesLabels(rg string) string {
+func (a *AgentPoolProfile) GetKubernetesLabels(rg string, deprecated bool) string {
 	var buf bytes.Buffer
-	buf.WriteString("node-role.kubernetes.io/agent=")
-	buf.WriteString(fmt.Sprintf(",kubernetes.io/role=agent,agentpool=%s", a.Name))
+	buf.WriteString("kubernetes.azure.com/role=agent")
+	if deprecated {
+		buf.WriteString(",node-role.kubernetes.io/agent=")
+		buf.WriteString(",kubernetes.io/role=agent")
+	}
+	buf.WriteString(fmt.Sprintf(",agentpool=%s", a.Name))
 	if a.StorageProfile == ManagedDisks {
 		storagetier, _ := common.GetStorageAccountType(a.VMSize)
 		buf.WriteString(fmt.Sprintf(",storageprofile=managed,storagetier=%s", storagetier))
@@ -1797,6 +1827,31 @@ func (p *Properties) IsNvidiaDevicePluginCapable() bool {
 	return p.HasNSeriesSKU() && common.IsKubernetesVersionGe(p.OrchestratorProfile.OrchestratorVersion, "1.10.0")
 }
 
+// SetCloudProviderRateLimitDefaults sets default cloudprovider rate limiter config
+func (p *Properties) SetCloudProviderRateLimitDefaults() {
+	if p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitBucket == 0 {
+		if p.HasVMSSAgentPool() && !p.IsHostedMasterProfile() {
+			var rateLimitBucket int
+			for _, profile := range p.AgentPoolProfiles {
+				if profile.AvailabilityProfile == VirtualMachineScaleSets {
+					rateLimitBucket += common.MaxAgentCount
+				}
+
+			}
+			p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitBucket = rateLimitBucket
+		} else {
+			p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitBucket = DefaultKubernetesCloudProviderRateLimitBucket
+		}
+	}
+	if p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitQPS == 0 {
+		if (DefaultKubernetesCloudProviderRateLimitQPS / float64(p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitBucket)) < common.MinCloudProviderQPSToBucketFactor {
+			p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitQPS = float64(p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitBucket) * common.MinCloudProviderQPSToBucketFactor
+		} else {
+			p.OrchestratorProfile.KubernetesConfig.CloudProviderRateLimitQPS = DefaultKubernetesCloudProviderRateLimitQPS
+		}
+	}
+}
+
 // IsReschedulerEnabled checks if the rescheduler addon is enabled
 func (k *KubernetesConfig) IsReschedulerEnabled() bool {
 	return k.IsAddonEnabled(ReschedulerAddonName)
@@ -1829,16 +1884,6 @@ func (k *KubernetesConfig) SetCloudProviderBackoffDefaults() {
 	}
 	if k.CloudProviderBackoffRetries == 0 {
 		k.CloudProviderBackoffRetries = DefaultKubernetesCloudProviderBackoffRetries
-	}
-}
-
-// SetCloudProviderRateLimitDefaults sets default cloudprovider rate limiter config
-func (k *KubernetesConfig) SetCloudProviderRateLimitDefaults() {
-	if k.CloudProviderRateLimitQPS == 0 {
-		k.CloudProviderRateLimitQPS = DefaultKubernetesCloudProviderRateLimitQPS
-	}
-	if k.CloudProviderRateLimitBucket == 0 {
-		k.CloudProviderRateLimitBucket = DefaultKubernetesCloudProviderRateLimitBucket
 	}
 }
 

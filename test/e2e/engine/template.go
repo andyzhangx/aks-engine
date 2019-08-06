@@ -42,6 +42,7 @@ type Config struct {
 	TenantID              string `envconfig:"TENANT_ID"`
 	ImageName             string `envconfig:"IMAGE_NAME"`
 	ImageResourceGroup    string `envconfig:"IMAGE_RESOURCE_GROUP"`
+	DebugCrashingPods     bool   `envconfig:"DEBUG_CRASHING_PODS" default:"false"`
 
 	ClusterDefinitionPath     string // The original template we want to use to build the cluster from.
 	ClusterDefinitionTemplate string // This is the template after we splice in the environment variables
@@ -290,7 +291,7 @@ func ParseInput(path string) (*api.VlabsARMContainerService, error) {
 }
 
 // ParseOutput takes the generated api model and will parse that into a api.ContainerService
-func ParseOutput(path string) (*api.ContainerService, error) {
+func ParseOutput(path string, validate, isUpdate bool) (*api.ContainerService, error) {
 	locale, err := i18n.LoadTranslations()
 	if err != nil {
 		return nil, errors.Errorf(fmt.Sprintf("error loading translation files: %s", err.Error()))
@@ -300,7 +301,7 @@ func ParseOutput(path string) (*api.ContainerService, error) {
 			Locale: locale,
 		},
 	}
-	containerService, _, err := apiloader.LoadContainerServiceFromFile(path, true, false, nil)
+	containerService, _, err := apiloader.LoadContainerServiceFromFile(path, validate, isUpdate, nil)
 	if err != nil {
 		return nil, err
 	}

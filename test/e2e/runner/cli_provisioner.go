@@ -170,7 +170,7 @@ func (cli *CLIProvisioner) provision() error {
 			subnets = append(subnets, masterSubnetName)
 			for i, pool := range cs.ContainerService.Properties.AgentPoolProfiles {
 				subnetName := fmt.Sprintf("%sCustomSubnet", pool.Name)
-				err = cli.Account.CreateSubnet(vnetName, subnetName, fmt.Sprintf("10.239.%d.0/24", i+1))
+				err = cli.Account.CreateSubnet(vnetName, subnetName, fmt.Sprintf("10.239.%d.0/22", i*4))
 				if err != nil {
 					return errors.Errorf("Error trying to create subnet:%s", err.Error())
 				}
@@ -261,7 +261,9 @@ func (cli *CLIProvisioner) generateAndDeploy() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to parse config")
 	}
-	csGenerated, err := engine.ParseOutput(engCfg.GeneratedDefinitionPath + "/apimodel.json")
+	validate := true
+	isUpdate := false
+	csGenerated, err := engine.ParseOutput(engCfg.GeneratedDefinitionPath+"/apimodel.json", validate, isUpdate)
 	if err != nil {
 		return errors.Wrap(err, "unable to parse output")
 	}

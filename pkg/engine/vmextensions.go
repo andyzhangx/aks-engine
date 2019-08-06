@@ -68,7 +68,7 @@ func CreateCustomScriptExtension(cs *api.ContainerService) VirtualMachineExtensi
 		if cs.GetCloudSpecConfig().CloudName == api.AzureChinaCloud {
 			registry = `gcr.azk8s.cn 80`
 		} else {
-			registry = `k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz docker.io 443`
+			registry = `aksrepos.azurecr.io 443`
 		}
 		outBoundCmd = `ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz ` + registry + ` || exit $ERR_OUTBOUND_CONN_FAIL;`
 	}
@@ -122,7 +122,7 @@ func createAgentVMASCustomScriptExtension(cs *api.ContainerService, profile *api
 		if cs.GetCloudSpecConfig().CloudName == api.AzureChinaCloud {
 			registry = `gcr.azk8s.cn 80`
 		} else {
-			registry = `k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz docker.io 443`
+			registry = `aksrepos.azurecr.io 443`
 		}
 		outBoundCmd = `ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz ` + registry + ` || exit $ERR_OUTBOUND_CONN_FAIL;`
 	}
@@ -152,7 +152,7 @@ func createAgentVMASCustomScriptExtension(cs *api.ContainerService, profile *api
 		vmExtension.VirtualMachineExtensionProperties.Type = to.StringPtr("CustomScriptExtension")
 		vmExtension.TypeHandlerVersion = to.StringPtr("1.8")
 		vmExtension.ProtectedSettings = &map[string]interface{}{
-			"commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -command \"', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'), ' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '\" > %SYSTEMDRIVE%\\AzureData\\CustomDataSetupScript.log 2>&1')]",
+			"commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -command \"', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'),' -NetworkAPIVersion ',variables('apiVersionNetwork'),' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '\" > %SYSTEMDRIVE%\\AzureData\\CustomDataSetupScript.log 2>&1')]",
 		}
 	} else {
 		vmExtension.Publisher = to.StringPtr("Microsoft.Azure.Extensions")

@@ -74,7 +74,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	csInput, err := engine.ParseInput(engCfg.ClusterDefinitionTemplate)
 	Expect(err).NotTo(HaveOccurred())
-	csGenerated, err := engine.ParseOutput(engCfg.GeneratedDefinitionPath + "/apimodel.json")
+	isUpdate := cfg.Name != ""
+	validate := false
+	csGenerated, err := engine.ParseOutput(engCfg.GeneratedDefinitionPath+"/apimodel.json", validate, isUpdate)
 	Expect(err).NotTo(HaveOccurred())
 	eng = engine.Engine{
 		Config:             engCfg,
@@ -480,7 +482,7 @@ var _ = Describe("Azure Container Cluster using the Kubernetes Orchestrator", fu
 					Expect(err).NotTo(HaveOccurred())
 					log.Printf("kubectl port-forward output: %s\n", proxyOutStr)
 					defer func() {
-						proxyCmd.Process.Signal(os.Interrupt)
+						proxyCmd.Process.Signal(os.Kill)
 						proxyCmd.Wait()
 					}()
 					By("Running curl to access the forwarded port")
@@ -545,6 +547,26 @@ var _ = Describe("Azure Container Cluster using the Kubernetes Orchestrator", fu
 			Expect(len(nodeList)).To(Equal(nodes))
 		})
 
+		It("should have node labels specific to masters or agents", func() {
+			nodeList, err := node.Get()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(nodeList.Nodes)).To(Equal(eng.NodeCount()))
+			for _, node := range nodeList.Nodes {
+				role := "agent"
+				if strings.HasPrefix(node.Metadata.Name, "k8s-master") {
+					role = "master"
+				}
+				labels := node.Metadata.Labels
+				// See https://github.com/Azure/aks-engine/issues/1660
+				if node.IsWindows() && common.IsKubernetesVersionGe(
+					eng.ExpandedDefinition.Properties.OrchestratorProfile.OrchestratorVersion, "1.16.0-alpha.1") {
+					Skip("Kubernetes 1.16 on Windows needs node labels applied")
+				}
+				Expect(labels).To(HaveKeyWithValue("kubernetes.io/role", role))
+				Expect(labels).To(HaveKey(fmt.Sprintf("node-role.kubernetes.io/%s", role)))
+			}
+		})
+
 		It("should print cluster resources", func() {
 			cmd := exec.Command("k", "get", "deployments,pods,svc,daemonsets,configmaps,endpoints,jobs,clusterroles,clusterrolebindings,roles,rolebindings,storageclasses", "--all-namespaces", "-o", "wide")
 			out, err := cmd.CombinedOutput()
@@ -583,19 +605,23 @@ var _ = Describe("Azure Container Cluster using the Kubernetes Orchestrator", fu
 		})
 
 		It("Should not have any unready or crashing pods right after deployment", func() {
-			By("Checking ready status of each pod in kube-system")
-			pods, err := pod.GetAll("kube-system")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(len(pods.Pods)).ToNot(BeZero())
-			for _, currentPod := range pods.Pods {
-				log.Printf("Checking %s - ready: %t, restarts: %d", currentPod.Metadata.Name, currentPod.Status.ContainerStatuses[0].Ready, currentPod.Status.ContainerStatuses[0].RestartCount)
-				Expect(currentPod.Status.ContainerStatuses[0].Ready).To(BeTrue())
-				tooManyRestarts := 5
-				if strings.Contains(currentPod.Metadata.Name, "cluster-autoscaler") {
-					log.Print("need to investigate cluster-autoscaler restarts!")
-					tooManyRestarts = 10
+			if eng.Config.DebugCrashingPods {
+				By("Checking ready status of each pod in kube-system")
+				pods, err := pod.GetAll("kube-system")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(pods.Pods)).ToNot(BeZero())
+				for _, currentPod := range pods.Pods {
+					log.Printf("Checking %s - ready: %t, restarts: %d", currentPod.Metadata.Name, currentPod.Status.ContainerStatuses[0].Ready, currentPod.Status.ContainerStatuses[0].RestartCount)
+					Expect(currentPod.Status.ContainerStatuses[0].Ready).To(BeTrue())
+					tooManyRestarts := 5
+					if strings.Contains(currentPod.Metadata.Name, "cluster-autoscaler") {
+						log.Print("need to investigate cluster-autoscaler restarts!")
+						tooManyRestarts = 10
+					}
+					Expect(currentPod.Status.ContainerStatuses[0].RestartCount).To(BeNumerically("<", tooManyRestarts))
 				}
-				Expect(currentPod.Status.ContainerStatuses[0].RestartCount).To(BeNumerically("<", tooManyRestarts))
+			} else {
+				Skip("Skipping this DEBUG test")
 			}
 		})
 

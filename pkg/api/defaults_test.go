@@ -205,13 +205,13 @@ func TestAssignDefaultAddonImages(t *testing.T) {
 		ReschedulerAddonName:               "k8s.gcr.io/rescheduler:v0.3.1",
 		MetricsServerAddonName:             "k8s.gcr.io/metrics-server-amd64:v0.2.1",
 		NVIDIADevicePluginAddonName:        "nvidia/k8s-device-plugin:1.10",
-		ContainerMonitoringAddonName:       "microsoft/oms:ciprod04232019",
+		ContainerMonitoringAddonName:       "mcr.microsoft.com/azuremonitor/containerinsights/ciprod:ciprod07092019",
 		IPMASQAgentAddonName:               "k8s.gcr.io/ip-masq-agent-amd64:v2.3.0",
 		AzureCNINetworkMonitoringAddonName: "mcr.microsoft.com/containernetworking/networkmonitor:v0.0.6",
 		DNSAutoscalerAddonName:             "k8s.gcr.io/cluster-proportional-autoscaler-amd64:1.1.1",
 		HeapsterAddonName:                  "k8s.gcr.io/heapster-amd64:v1.5.4",
 		CalicoAddonName:                    "calico/typha:v3.7.2",
-		AzureNetworkPolicyAddonName:        "mcr.microsoft.com/containernetworking/azure-npm:v1.0.18",
+		AzureNetworkPolicyAddonName:        "mcr.microsoft.com/containernetworking/azure-npm:v1.0.24",
 		AADPodIdentityAddonName:            "mcr.microsoft.com/k8s/aad-pod-identity/nmi:1.2",
 	}
 
@@ -893,24 +893,6 @@ func TestContainerRuntime(t *testing.T) {
 	mockCS = getMockBaseContainerService("1.10.13")
 	properties = mockCS.Properties
 	properties.OrchestratorProfile.OrchestratorType = Kubernetes
-	properties.OrchestratorProfile.KubernetesConfig.ContainerRuntime = ClearContainers
-	mockCS.setOrchestratorDefaults(false, false)
-	if properties.OrchestratorProfile.KubernetesConfig.ContainerRuntime != ClearContainers {
-		t.Fatalf("ContainerRuntime did not have the expected value, got %s, expected %s",
-			properties.OrchestratorProfile.KubernetesConfig.ContainerRuntime, ClearContainers)
-	}
-	if properties.OrchestratorProfile.KubernetesConfig.MobyVersion != "" {
-		t.Fatalf("MobyVersion did not have the expected value, got %s, expected %s",
-			properties.OrchestratorProfile.KubernetesConfig.MobyVersion, "")
-	}
-	if properties.OrchestratorProfile.KubernetesConfig.ContainerdVersion != DefaultContainerdVersion {
-		t.Fatalf("Containerd did not have the expected value, got %s, expected %s",
-			properties.OrchestratorProfile.KubernetesConfig.ContainerdVersion, DefaultContainerdVersion)
-	}
-
-	mockCS = getMockBaseContainerService("1.10.13")
-	properties = mockCS.Properties
-	properties.OrchestratorProfile.OrchestratorType = Kubernetes
 	properties.OrchestratorProfile.KubernetesConfig.ContainerRuntime = KataContainers
 	mockCS.setOrchestratorDefaults(false, false)
 	if properties.OrchestratorProfile.KubernetesConfig.ContainerRuntime != KataContainers {
@@ -1309,6 +1291,17 @@ func TestMasterProfileDefaults(t *testing.T) {
 	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
 		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
 			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
+	// this validates default configurations for OutboundRuleIdleTimeoutInMinutes.
+	mockCS = getMockBaseContainerService("1.14.4")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku = StandardLoadBalancerSku
+	mockCS.SetPropertiesDefaults(false, false)
+	if properties.OrchestratorProfile.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes != DefaultOutboundRuleIdleTimeoutInMinutes {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes did not have the expected configuration, got %d, expected %d",
+			properties.OrchestratorProfile.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes, DefaultOutboundRuleIdleTimeoutInMinutes)
 	}
 }
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 source /home/packer/provision_installs.sh
 source /home/packer/provision_source.sh
+source /home/packer/packer_source.sh
 source /home/packer/cis.sh
 
 RELEASE_NOTES_FILEPATH=/var/log/azure/golden-image-install.complete
@@ -61,8 +62,8 @@ installGPUDrivers
 echo "  - nvidia-docker2 nvidia-container-runtime" >> ${RELEASE_NOTES_FILEPATH}
 
 VNET_CNI_VERSIONS="
+1.0.24
 1.0.22
-1.0.18
 "
 for VNET_CNI_VERSION in $VNET_CNI_VERSIONS; do
     VNET_CNI_PLUGINS_URL="https://acs-mirror.azureedge.net/cni/azure-vnet-cni-linux-amd64-v${VNET_CNI_VERSION}.tgz"
@@ -141,6 +142,7 @@ for METRICS_SERVER_VERSION in ${METRICS_SERVER_VERSIONS}; do
 done
 
 KUBE_DNS_VERSIONS="
+1.15.4
 1.15.0
 1.14.13
 1.14.5
@@ -167,6 +169,7 @@ for KUBE_ADDON_MANAGER_VERSION in ${KUBE_ADDON_MANAGER_VERSIONS}; do
 done
 
 KUBE_DNS_MASQ_VERSIONS="
+1.15.4
 1.15.0
 1.14.10
 1.14.8
@@ -200,12 +203,16 @@ for TILLER_VERSION in ${TILLER_VERSIONS}; do
 done
 
 CLUSTER_AUTOSCALER_VERSIONS="
+1.15.1
 1.15.0
+1.14.4
 1.14.2
 1.14.0
+1.13.6
 1.13.4
 1.13.2
 1.13.1
+1.12.7
 1.12.5
 1.12.3
 1.12.2
@@ -362,6 +369,8 @@ echo "  - busybox" >> ${RELEASE_NOTES_FILEPATH}
 
 # TODO: fetch supported k8s versions from an aks-engine command instead of hardcoding them here
 K8S_VERSIONS="
+1.15.1
+1.15.1-azs
 1.15.0
 1.14.4
 1.14.4-azs
@@ -394,6 +403,11 @@ for KUBERNETES_VERSION in ${K8S_VERSIONS}; do
     extractHyperkube "docker"
     echo "  - ${HYPERKUBE_URL}" >> ${RELEASE_NOTES_FILEPATH}
 done
+
+# TODO: remove once ACR is available on Azure Stack
+CONTAINER_IMAGE="registry:2.7.1"
+pullContainerImage "docker" ${CONTAINER_IMAGE}
+echo "  - ${CONTAINER_IMAGE}" >> ${RELEASE_NOTES_FILEPATH}
 
 df -h
 

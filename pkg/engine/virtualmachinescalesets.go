@@ -286,7 +286,7 @@ func CreateMasterVMSS(cs *api.ContainerService) VirtualMachineScaleSetARM {
 		if cs.GetCloudSpecConfig().CloudName == api.AzureChinaCloud {
 			registry = `gcr.azk8s.cn 80`
 		} else {
-			registry = `k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz docker.io 443`
+			registry = `aksrepos.azurecr.io 443`
 		}
 		outBoundCmd = `ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz ` + registry + ` || exit $ERR_OUTBOUND_CONN_FAIL;`
 	}
@@ -350,6 +350,12 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 		dependencies = append(dependencies, "[variables('nsgID')]")
 	} else {
 		dependencies = append(dependencies, "[variables('vnetID')]")
+	}
+
+	if !cs.Properties.OrchestratorProfile.IsPrivateCluster() &&
+		profile.LoadBalancerBackendAddressPoolIDs == nil &&
+		cs.Properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku == api.StandardLoadBalancerSku {
+		dependencies = append(dependencies, "[variables('agentLbID')]")
 	}
 
 	orchProfile := cs.Properties.OrchestratorProfile
@@ -453,25 +459,46 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 	for i := 1; i <= profile.IPAddressCount; i++ {
 		ipconfig := compute.VirtualMachineScaleSetIPConfiguration{
 			Name: to.StringPtr(fmt.Sprintf("ipconfig%d", i)),
-			VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
-				Subnet: &compute.APIEntityReference{
-					ID: to.StringPtr(fmt.Sprintf("[variables('%sVnetSubnetID')]", profile.Name)),
-				},
+		}
+		ipConfigProps := compute.VirtualMachineScaleSetIPConfigurationProperties{
+			Subnet: &compute.APIEntityReference{
+				ID: to.StringPtr(fmt.Sprintf("[variables('%sVnetSubnetID')]", profile.Name)),
 			},
 		}
-		if i == 1 {
-			ipconfig.Primary = to.BoolPtr(true)
 
+		if i == 1 {
+			ipConfigProps.Primary = to.BoolPtr(true)
+
+			backendAddressPools := []compute.SubResource{}
 			if profile.LoadBalancerBackendAddressPoolIDs != nil {
-				backendPools := make([]compute.SubResource, 0)
 				for _, lbBackendPoolID := range profile.LoadBalancerBackendAddressPoolIDs {
-					backendPools = append(backendPools,
+					backendAddressPools = append(backendAddressPools,
 						compute.SubResource{
 							ID: to.StringPtr(lbBackendPoolID),
 						},
 					)
 				}
-				ipconfig.LoadBalancerBackendAddressPools = &backendPools
+			} else {
+				if !cs.Properties.OrchestratorProfile.IsPrivateCluster() &&
+					cs.Properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku == api.StandardLoadBalancerSku {
+					agentLbBackendAddressPools := compute.SubResource{
+						ID: to.StringPtr("[concat(variables('agentLbID'), '/backendAddressPools/', variables('agentLbBackendPoolName'))]"),
+					}
+					backendAddressPools = append(backendAddressPools, agentLbBackendAddressPools)
+				}
+			}
+
+			ipConfigProps.LoadBalancerBackendAddressPools = &backendAddressPools
+			if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
+				defaultIPv4BackendPool := compute.SubResource{
+					ID: to.StringPtr("[concat(resourceId('Microsoft.Network/loadBalancers',parameters('masterEndpointDNSNamePrefix')), '/backendAddressPools/', parameters('masterEndpointDNSNamePrefix'))]"),
+				}
+				backendPools := make([]compute.SubResource, 0)
+				if ipConfigProps.LoadBalancerBackendAddressPools != nil {
+					backendPools = *ipConfigProps.LoadBalancerBackendAddressPools
+				}
+				backendPools = append(backendPools, defaultIPv4BackendPool)
+				ipConfigProps.LoadBalancerBackendAddressPools = &backendPools
 			}
 
 			// Set VMSS node public IP if requested
@@ -482,10 +509,33 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 						IdleTimeoutInMinutes: to.Int32Ptr(30),
 					},
 				}
-				ipconfig.PublicIPAddressConfiguration = publicIPAddressConfiguration
+				ipConfigProps.PublicIPAddressConfiguration = publicIPAddressConfiguration
 			}
 		}
+		ipconfig.VirtualMachineScaleSetIPConfigurationProperties = &ipConfigProps
 		ipConfigurations = append(ipConfigurations, ipconfig)
+
+		if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
+			ipconfigv6 := compute.VirtualMachineScaleSetIPConfiguration{
+				Name: to.StringPtr(fmt.Sprintf("ipconfig%dv6", i)),
+				VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
+					Subnet: &compute.APIEntityReference{
+						ID: to.StringPtr(fmt.Sprintf("[variables('%sVnetSubnetID')]", profile.Name)),
+					},
+					Primary:                 to.BoolPtr(false),
+					PrivateIPAddressVersion: "IPv6",
+				},
+			}
+			if i == 1 {
+				backendPools := make([]compute.SubResource, 0)
+				defaultIPv6BackendPool := compute.SubResource{
+					ID: to.StringPtr("[concat(resourceId('Microsoft.Network/loadBalancers',parameters('masterEndpointDNSNamePrefix')), '/backendAddressPools/', parameters('masterEndpointDNSNamePrefix'), '-ipv6')]"),
+				}
+				backendPools = append(backendPools, defaultIPv6BackendPool)
+				ipconfigv6.LoadBalancerBackendAddressPools = &backendPools
+			}
+			ipConfigurations = append(ipConfigurations, ipconfigv6)
+		}
 	}
 
 	vmssNICConfig.IPConfigurations = &ipConfigurations
@@ -616,6 +666,13 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 		osDisk.DiskSizeGB = to.Int32Ptr(int32(profile.OSDiskSizeGB))
 	}
 
+	if profile.IsEphemeral() {
+		osDisk.Caching = compute.CachingTypesReadOnly
+		osDisk.DiffDiskSettings = &compute.DiffDiskSettings{
+			Option: compute.Local,
+		}
+	}
+
 	vmssStorageProfile.OsDisk = &osDisk
 
 	vmssVMProfile.StorageProfile = &vmssStorageProfile
@@ -634,7 +691,7 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 		if cs.GetCloudSpecConfig().CloudName == api.AzureChinaCloud {
 			registry = `gcr.azk8s.cn 80`
 		} else {
-			registry = `k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz gcr.io 443 && retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz docker.io 443`
+			registry = `aksrepos.azurecr.io 443`
 		}
 		outBoundCmd = `ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 ` + ncBinary + ` -vz ` + registry + ` || exit $ERR_OUTBOUND_CONN_FAIL;`
 	}
@@ -651,7 +708,7 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 				AutoUpgradeMinorVersion: to.BoolPtr(true),
 				Settings:                map[string]interface{}{},
 				ProtectedSettings: map[string]interface{}{
-					"commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -command \"', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'), ' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '\" > %SYSTEMDRIVE%\\AzureData\\CustomDataSetupScript.log 2>&1')]",
+					"commandToExecute": "[concat('powershell.exe -ExecutionPolicy Unrestricted -command \"', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'),' -NetworkAPIVersion ',variables('apiVersionNetwork'),' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '\" > %SYSTEMDRIVE%\\AzureData\\CustomDataSetupScript.log 2>&1')]",
 				},
 			},
 		}

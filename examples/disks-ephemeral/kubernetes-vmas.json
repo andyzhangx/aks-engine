@@ -2,33 +2,21 @@
   "apiVersion": "vlabs",
   "properties": {
     "orchestratorProfile": {
-      "orchestratorType": "Kubernetes",
-      "orchestratorRelease": "1.12",
-      "kubernetesConfig": {
-        "networkPlugin": "flannel",
-        "containerRuntime": "clear-containers",
-        "addons": [
-          {
-            "name": "tiller",
-            "enabled" : false
-          },
-          {
-            "name": "kubernetes-dashboard",
-            "enabled" : false
-          }
-        ]
-      }
+      "orchestratorType": "Kubernetes"
     },
     "masterProfile": {
       "count": 1,
       "dnsPrefix": "",
-      "vmSize": "Standard_D2_v3"
+      "vmSize": "Standard_D2_v2",
+      "OSDiskSizeGB": 200
     },
     "agentPoolProfiles": [
       {
-        "name": "agentpool1",
+        "name": "agent",
         "count": 3,
-        "vmSize": "Standard_D4s_v3",
+        "vmSize": "Standard_D2_v2",
+        "OSDiskSizeGB": 200,
+        "storageProfile" : "Ephemeral",
         "availabilityProfile": "AvailabilitySet"
       }
     ],

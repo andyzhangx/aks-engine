@@ -119,7 +119,7 @@ func TestCreateMasterVMSS(t *testing.T) {
 									AutoUpgradeMinorVersion: to.BoolPtr(true),
 									Settings:                map[string]interface{}{},
 									ProtectedSettings: map[string]interface{}{
-										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
+										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
 									},
 								},
 							},
@@ -238,7 +238,7 @@ func TestCreateMasterVMSS(t *testing.T) {
 					AutoUpgradeMinorVersion: to.BoolPtr(true),
 					Settings:                map[string]interface{}{},
 					ProtectedSettings: map[string]interface{}{
-						"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
+						"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
 					},
 				},
 			},
@@ -346,7 +346,7 @@ func TestCreateAgentVMSS(t *testing.T) {
 								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
 									Primary:                     to.BoolPtr(true),
 									EnableAcceleratedNetworking: to.BoolPtr(true),
-									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool")),
+									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), false, false),
 								},
 							},
 						},
@@ -362,7 +362,7 @@ func TestCreateAgentVMSS(t *testing.T) {
 									AutoUpgradeMinorVersion: to.BoolPtr(true),
 									Settings:                map[string]interface{}{},
 									ProtectedSettings: map[string]interface{}{
-										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
+										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
 								Name: to.StringPtr("[concat(variables('agentpool1VMNamePrefix'), '-computeAksLinuxBilling')]"),
 								VirtualMachineScaleSetExtensionProperties: &compute.VirtualMachineScaleSetExtensionProperties{
 									Publisher:               to.StringPtr("Microsoft.AKS"),
@@ -384,8 +384,64 @@ func TestCreateAgentVMSS(t *testing.T) {
 	if diff != "" {
 		t.Errorf("unexpected diff while expecting equal structs: %s", diff)
 	}
+	// Now Test AgentVMSS with SLB and provided LoadBalancerBackendAddressPoolIDs
+	// should still reference the provided LoadBalancerBackendAddressPoolIDs
+	cs.Properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku = api.StandardLoadBalancerSku
+	actual = CreateAgentVMSS(cs, cs.Properties.AgentPoolProfiles[0])
+
+	expected.VirtualMachineScaleSet.VirtualMachineScaleSetProperties.VirtualMachineProfile.NetworkProfile = &compute.VirtualMachineScaleSetNetworkProfile{
+		NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
+			{
+				Name: to.StringPtr("[variables('agentpool1VMNamePrefix')]"),
+				VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
+					Primary:                     to.BoolPtr(true),
+					EnableAcceleratedNetworking: to.BoolPtr(true),
+					IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), true, false),
+				},
+			},
+		},
+	}
+
+	diff = cmp.Diff(actual, expected)
+
+	if diff != "" {
+		t.Errorf("unexpected diff while expecting equal structs: %s", diff)
+	}
+
+	// Now Test AgentVMSS with SLB and no LoadBalancerBackendAddressPoolIDs is provided
+	// should include agentLbID as DependsOn and agentLbBackendPoolName should be part of the LoadBalancer BackendAddressPools
+	cs.Properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku = api.StandardLoadBalancerSku
+	cs.Properties.AgentPoolProfiles[0].LoadBalancerBackendAddressPoolIDs = nil
+	actual = CreateAgentVMSS(cs, cs.Properties.AgentPoolProfiles[0])
+
+	expected.DependsOn = []string{
+		"[variables('vnetID')]",
+		"[variables('agentLbID')]",
+	}
+
+	expected.VirtualMachineScaleSet.VirtualMachineScaleSetProperties.VirtualMachineProfile.NetworkProfile = &compute.VirtualMachineScaleSetNetworkProfile{
+		NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
+			{
+				Name: to.StringPtr("[variables('agentpool1VMNamePrefix')]"),
+				VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
+					Primary:                     to.BoolPtr(true),
+					EnableAcceleratedNetworking: to.BoolPtr(true),
+					IPConfigurations:            getIPConfigs(nil, true, false),
+				},
+			},
+		},
+	}
+
+	diff = cmp.Diff(actual, expected)
+
+	if diff != "" {
+		t.Errorf("unexpected diff while expecting equal structs: %s", diff)
+	}
 
 	// Now Test AgentVMSS with windows
+	// Restore LoadBalancerSku back to default and provide LoadBalancerBackendAddressPoolIDs
+	cs.Properties.OrchestratorProfile.KubernetesConfig.LoadBalancerSku = api.DefaultLoadBalancerSku
+	cs.Properties.AgentPoolProfiles[0].LoadBalancerBackendAddressPoolIDs = []string{"/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"}
 	cs.Properties.AgentPoolProfiles[0].OSType = "Windows"
 	cs.Properties.AgentPoolProfiles[0].AcceleratedNetworkingEnabledWindows = to.BoolPtr(true)
 	cs.Properties.WindowsProfile = &api.WindowsProfile{
@@ -395,6 +451,24 @@ func TestCreateAgentVMSS(t *testing.T) {
 	actual = CreateAgentVMSS(cs, cs.Properties.AgentPoolProfiles[0])
 
 	expectedCustomDataStr = getCustomDataFromJSON(tg.GetKubernetesWindowsNodeCustomDataJSONObject(cs, cs.Properties.AgentPoolProfiles[0]))
+
+	// Restore back to default
+	expected.DependsOn = []string{
+		"[variables('vnetID')]",
+	}
+	// Restore back to default
+	expected.VirtualMachineScaleSet.VirtualMachineScaleSetProperties.VirtualMachineProfile.NetworkProfile = &compute.VirtualMachineScaleSetNetworkProfile{
+		NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
+			{
+				Name: to.StringPtr("[variables('agentpool1VMNamePrefix')]"),
+				VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
+					Primary:                     to.BoolPtr(true),
+					EnableAcceleratedNetworking: to.BoolPtr(true),
+					IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), false, false),
+				},
+			},
+		},
+	}
 
 	expected.VirtualMachineProfile.OsProfile = &compute.VirtualMachineScaleSetOSProfile{
 		AdminUsername:      to.StringPtr("[parameters('windowsAdminUsername')]"),
@@ -417,7 +491,7 @@ func TestCreateAgentVMSS(t *testing.T) {
 					AutoUpgradeMinorVersion: to.BoolPtr(true),
 					Settings:                map[string]interface{}{},
 					ProtectedSettings: map[string]interface{}{
-						"commandToExecute": `[concat('powershell.exe -ExecutionPolicy Unrestricted -command "', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'), ' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '" > %SYSTEMDRIVE%\AzureData\CustomDataSetupScript.log 2>&1')]`,
+						"commandToExecute": `[concat('powershell.exe -ExecutionPolicy Unrestricted -command "', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'),' -NetworkAPIVersion ',variables('apiVersionNetwork'),' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '" > %SYSTEMDRIVE%\AzureData\CustomDataSetupScript.log 2>&1')]`,
 					},
 				},
 			},
@@ -444,6 +518,30 @@ func TestCreateAgentVMSS(t *testing.T) {
 	expected.Tags["resourceNameSuffix"] = to.StringPtr("[variables('winResourceNamePrefix')]")
 
 	diff = cmp.Diff(actual, expected)
+
+	if diff != "" {
+		t.Errorf("unexpected diff while expecting equal structs: %s", diff)
+	}
+
+	// Test with ipv6 dual stack enabled
+	cs.Properties.FeatureFlags = &api.FeatureFlags{EnableIPv6DualStack: true}
+	cs.Properties.AgentPoolProfiles[0].OSType = "Linux"
+	actual = CreateAgentVMSS(cs, cs.Properties.AgentPoolProfiles[0])
+
+	expected.VirtualMachineProfile.NetworkProfile = &compute.VirtualMachineScaleSetNetworkProfile{
+		NetworkInterfaceConfigurations: &[]compute.VirtualMachineScaleSetNetworkConfiguration{
+			{
+				Name: to.StringPtr("[variables('agentpool1VMNamePrefix')]"),
+				VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
+					Primary:                     to.BoolPtr(true),
+					EnableAcceleratedNetworking: to.BoolPtr(true),
+					IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), true, true),
+				},
+			},
+		},
+	}
+
+	diff = cmp.Diff(actual.VirtualMachineProfile.NetworkProfile, expected.VirtualMachineProfile.NetworkProfile)
 
 	if diff != "" {
 		t.Errorf("unexpected diff while expecting equal structs: %s", diff)
@@ -534,7 +632,7 @@ func TestCreateAgentVMSSHostedMasterProfile(t *testing.T) {
 								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
 									Primary:                     to.BoolPtr(true),
 									EnableAcceleratedNetworking: to.BoolPtr(true),
-									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool")),
+									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), false, false),
 								},
 							},
 						},
@@ -550,7 +648,7 @@ func TestCreateAgentVMSSHostedMasterProfile(t *testing.T) {
 									AutoUpgradeMinorVersion: to.BoolPtr(true),
 									Settings:                map[string]interface{}{},
 									ProtectedSettings: map[string]interface{}{
-										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
+										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
 								Name: to.StringPtr("[concat(variables('agentpool1VMNamePrefix'), '-AKSLinuxBilling')]"),
 								VirtualMachineScaleSetExtensionProperties: &compute.VirtualMachineScaleSetExtensionProperties{
 									Publisher:               to.StringPtr("Microsoft.AKS"),
@@ -605,7 +703,7 @@ func TestCreateAgentVMSSHostedMasterProfile(t *testing.T) {
 					AutoUpgradeMinorVersion: to.BoolPtr(true),
 					Settings:                map[string]interface{}{},
 					ProtectedSettings: map[string]interface{}{
-						"commandToExecute": `[concat('powershell.exe -ExecutionPolicy Unrestricted -command "', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'), ' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '" > %SYSTEMDRIVE%\AzureData\CustomDataSetupScript.log 2>&1')]`,
+						"commandToExecute": `[concat('powershell.exe -ExecutionPolicy Unrestricted -command "', '$arguments = ', variables('singleQuote'),'-MasterIP ',variables('kubernetesAPIServerIP'),' -KubeDnsServiceIp ',parameters('kubeDnsServiceIp'),' -MasterFQDNPrefix ',variables('masterFqdnPrefix'),' -Location ',variables('location'),' -TargetEnvironment ',parameters('targetEnvironment'),' -AgentKey ',parameters('clientPrivateKey'),' -AADClientId ',variables('servicePrincipalClientId'),' -AADClientSecret ',variables('singleQuote'),variables('singleQuote'),base64(variables('servicePrincipalClientSecret')),variables('singleQuote'),variables('singleQuote'),' -NetworkAPIVersion ',variables('apiVersionNetwork'),' ',variables('singleQuote'), ' ; ', variables('windowsCustomScriptSuffix'), '" > %SYSTEMDRIVE%\AzureData\CustomDataSetupScript.log 2>&1')]`,
 					},
 				},
 			},
@@ -669,7 +767,9 @@ func getIPConfigsMaster() *[]compute.VirtualMachineScaleSetIPConfiguration {
 	return &ipConfigs
 }
 
-func getIPConfigs(lbBackendAddresPoolID *string) *[]compute.VirtualMachineScaleSetIPConfiguration {
+// getIPConfigs returns a list of VirtualMachineScaleSetIPConfiguration resources
+// first ipconfig is primary with a list of references to LoadBalancerBackendAddressPools
+func getIPConfigs(lbBackendAddresPoolID *string, isStandardLB, ipv6DualStackEnabled bool) *[]compute.VirtualMachineScaleSetIPConfiguration {
 	var ipConfigs []compute.VirtualMachineScaleSetIPConfiguration
 	for i := 1; i <= 31; i++ {
 		ipconfig := compute.VirtualMachineScaleSetIPConfiguration{
@@ -690,11 +790,57 @@ func getIPConfigs(lbBackendAddresPoolID *string) *[]compute.VirtualMachineScaleS
 				},
 			}
 			ipconfig.PublicIPAddressConfiguration = publicIPAddressConfiguration
+			backendAddressPools := []compute.SubResource{}
 			if lbBackendAddresPoolID != nil {
-				ipconfig.LoadBalancerBackendAddressPools = &[]compute.SubResource{{ID: lbBackendAddresPoolID}}
+				lbBackendAddressPools := compute.SubResource{
+					ID: lbBackendAddresPoolID,
+				}
+				backendAddressPools = append(backendAddressPools, lbBackendAddressPools)
+			} else {
+				if isStandardLB {
+					agentLbBackendAddressPools := compute.SubResource{
+						ID: to.StringPtr("[concat(variables('agentLbID'), '/backendAddressPools/', variables('agentLbBackendPoolName'))]"),
+					}
+					backendAddressPools = append(backendAddressPools, agentLbBackendAddressPools)
+				}
+			}
+			ipconfig.LoadBalancerBackendAddressPools = &backendAddressPools
+			if ipv6DualStackEnabled {
+				defaultIPv4BackendPool := compute.SubResource{
+					ID: to.StringPtr("[concat(resourceId('Microsoft.Network/loadBalancers',parameters('masterEndpointDNSNamePrefix')), '/backendAddressPools/', parameters('masterEndpointDNSNamePrefix'))]"),
+				}
+				if ipconfig.LoadBalancerBackendAddressPools != nil {
+					backendPools := *ipconfig.LoadBalancerBackendAddressPools
+					backendPools = append(backendPools, defaultIPv4BackendPool)
+					ipconfig.LoadBalancerBackendAddressPools = &backendPools
+				} else {
+					ipconfig.LoadBalancerBackendAddressPools = &[]compute.SubResource{defaultIPv4BackendPool}
+				}
 			}
 		}
 		ipConfigs = append(ipConfigs, ipconfig)
+
+		if ipv6DualStackEnabled {
+			ipconfigv6 := compute.VirtualMachineScaleSetIPConfiguration{
+				Name: to.StringPtr(fmt.Sprintf("ipconfig%dv6", i)),
+				VirtualMachineScaleSetIPConfigurationProperties: &compute.VirtualMachineScaleSetIPConfigurationProperties{
+					Subnet: &compute.APIEntityReference{
+						ID: to.StringPtr(fmt.Sprintf("[variables('agentpool1VnetSubnetID')]")),
+					},
+					Primary:                 to.BoolPtr(false),
+					PrivateIPAddressVersion: "IPv6",
+				},
+			}
+			if i == 1 {
+				backendPools := make([]compute.SubResource, 0)
+				defaultIPv6BackendPool := compute.SubResource{
+					ID: to.StringPtr("[concat(resourceId('Microsoft.Network/loadBalancers',parameters('masterEndpointDNSNamePrefix')), '/backendAddressPools/', parameters('masterEndpointDNSNamePrefix'), '-ipv6')]"),
+				}
+				backendPools = append(backendPools, defaultIPv6BackendPool)
+				ipconfigv6.LoadBalancerBackendAddressPools = &backendPools
+			}
+			ipConfigs = append(ipConfigs, ipconfigv6)
+		}
 	}
 	return &ipConfigs
 }
@@ -828,7 +974,7 @@ func TestCreateCustomOSVMSS(t *testing.T) {
 									AutoUpgradeMinorVersion: to.BoolPtr(true),
 									Settings:                map[string]interface{}{},
 									ProtectedSettings: map[string]interface{}{
-										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
+										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,variables('provisionScriptParametersMaster'), ' /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`,
 									},
 								},
 							},
@@ -923,7 +1069,7 @@ func TestCreateCustomOSVMSS(t *testing.T) {
 								VirtualMachineScaleSetNetworkConfigurationProperties: &compute.VirtualMachineScaleSetNetworkConfigurationProperties{
 									Primary:                     to.BoolPtr(true),
 									EnableAcceleratedNetworking: to.BoolPtr(true),
-									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool")),
+									IPConfigurations:            getIPConfigs(to.StringPtr("/subscriptions/123/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/mySLB/backendAddressPools/mySLBBEPool"), false, false),
 								},
 							},
 						},
@@ -939,7 +1085,7 @@ func TestCreateCustomOSVMSS(t *testing.T) {
 									AutoUpgradeMinorVersion: to.BoolPtr(true),
 									Settings:                map[string]interface{}{},
 									ProtectedSettings: map[string]interface{}{
-										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz k8s.gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz gcr.io 443 && retrycmd_if_failure 50 1 3 nc -vz docker.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
+										"commandToExecute": `[concat('retrycmd_if_failure() { r=$1; w=$2; t=$3; shift && shift && shift; for i in $(seq 1 $r); do timeout $t ${@}; [ $? -eq 0  ] && break || if [ $i -eq $r ]; then return 1; else sleep $w; fi; done }; ERR_OUTBOUND_CONN_FAIL=50; retrycmd_if_failure 50 1 3 nc -vz aksrepos.azurecr.io 443 || exit $ERR_OUTBOUND_CONN_FAIL; for i in $(seq 1 1200); do if [ -f /opt/azure/containers/provision.sh ]; then break; fi; if [ $i -eq 1200 ]; then exit 100; else sleep 1; fi; done; ', variables('provisionScriptParametersCommon'),` + generateUserAssignedIdentityClientIDParameter(userAssignedIDEnabled) + `,' GPU_NODE=false SGX_NODE=false AUDITD_ENABLED=false /usr/bin/nohup /bin/bash -c "/bin/bash /opt/azure/containers/provision.sh >> /var/log/azure/cluster-provision.log 2>&1"')]`}}}, {
 								Name: to.StringPtr("[concat(variables('agentpool1VMNamePrefix'), '-computeAksLinuxBilling')]"),
 								VirtualMachineScaleSetExtensionProperties: &compute.VirtualMachineScaleSetExtensionProperties{
 									Publisher:               to.StringPtr("Microsoft.AKS"),

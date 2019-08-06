@@ -1481,16 +1481,18 @@ func TestSetAddonsConfig(t *testing.T) {
 					Enabled: to.BoolPtr(true),
 					Config: map[string]string{
 						"omsAgentVersion":       "1.10.0.1",
-						"dockerProviderVersion": "4.0.0-0",
+						"dockerProviderVersion": "6.0.0-0",
+						"schema-versions":       "v1",
+						"clusterName":           "aks-engine-cluster",
 					},
 					Containers: []KubernetesContainerSpec{
 						{
 							Name:           "omsagent",
-							CPURequests:    "50m",
+							CPURequests:    "75m",
 							MemoryRequests: "225Mi",
 							CPULimits:      "150m",
-							MemoryLimits:   "500Mi",
-							Image:          "microsoft/oms:ciprod04232019",
+							MemoryLimits:   "600Mi",
+							Image:          "mcr.microsoft.com/azuremonitor/containerinsights/ciprod:ciprod07092019",
 						},
 					},
 				},
@@ -1704,7 +1706,11 @@ func TestSetAddonsConfig(t *testing.T) {
 					Containers: []KubernetesContainerSpec{
 						{
 							Name:  AzureNetworkPolicyAddonName,
-							Image: "mcr.microsoft.com/containernetworking/azure-npm:v1.0.18",
+							Image: "mcr.microsoft.com/containernetworking/azure-npm:v1.0.24",
+						},
+						{
+							Name:  AzureVnetTelemetryAddonName,
+							Image: "mcr.microsoft.com/containernetworking/azure-vnet-telemetry:v1.0.24",
 						},
 					},
 				},

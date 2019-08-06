@@ -25,7 +25,7 @@ GITTAG := $(VERSION_SHORT)
 endif
 
 REPO_PATH := github.com/Azure/$(PROJECT)
-DEV_ENV_IMAGE := quay.io/deis/go-dev:v1.22.3
+DEV_ENV_IMAGE := quay.io/deis/go-dev:v1.22.4
 DEV_ENV_WORK_DIR := /go/src/$(REPO_PATH)
 DEV_ENV_OPTS := --rm -v $(CURDIR):$(DEV_ENV_WORK_DIR) -w $(DEV_ENV_WORK_DIR) $(DEV_ENV_VARS)
 DEV_ENV_CMD := docker run $(DEV_ENV_OPTS) $(DEV_ENV_IMAGE)
@@ -155,7 +155,7 @@ test-e2e:
 HAS_DEP := $(shell $(CHECK) dep)
 HAS_GOX := $(shell $(CHECK) gox)
 HAS_GIT := $(shell $(CHECK) git)
-HAS_GOLANGCI := $(shell $(CHECK) golangci-lint)
+HAS_GOLANGCI ?= $(shell $(CHECK) golangci-lint)
 HAS_GINKGO := $(shell $(CHECK) ginkgo)
 
 .PHONY: bootstrap
