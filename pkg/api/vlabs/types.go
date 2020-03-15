@@ -505,7 +505,7 @@ type AgentPoolProfile struct {
 	AuditDEnabled                       *bool                `json:"auditDEnabled,omitempty"`
 	CustomVMTags                        map[string]string    `json:"customVMTags,omitempty"`
 	DiskEncryptionSetID                 string               `json:"diskEncryptionSetID,omitempty"`
-
+	ProximityPlacementGroupEnabled      *bool                `json:"proximityPlacementGroup,omitempty"`
 	// subnet is internal
 	subnet string
 

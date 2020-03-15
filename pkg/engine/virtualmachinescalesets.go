@@ -688,6 +688,10 @@ func CreateAgentVMSS(cs *api.ContainerService, profile *api.AgentPoolProfile) Vi
 		}
 	}
 
+	if to.Bool(profile.ProximityPlacementGroupEnabled) {
+
+	}
+
 	vmssStorageProfile.OsDisk = &osDisk
 
 	vmssVMProfile.StorageProfile = &vmssStorageProfile

@@ -198,3 +198,9 @@ type DeploymentWithResourceGroupARM struct {
 	ResourceGroup *string `json:"resourceGroup,omitempty"`
 	resources.DeploymentExtended
 }
+
+// ProximityPlacementGroupARM embeds the ARMResource type in compute.ProximityPlacementGroup.
+type ProximityPlacementGroupARM struct {
+	ARMResource
+	compute.ProximityPlacementGroup
+}

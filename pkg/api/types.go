@@ -654,6 +654,7 @@ type AgentPoolProfile struct {
 	CustomVMTags                        map[string]string    `json:"customVMTags,omitempty"`
 	DiskEncryptionSetID                 string               `json:"diskEncryptionSetID,omitempty"`
 	SysctlDConfig                       map[string]string    `json:"sysctldConfig,omitempty"`
+	ProximityPlacementGroupEnabled      *bool                `json:"proximityPlacementGroupEnabled,omitempty"`
 }
 
 // AgentPoolProfileRole represents an agent role
